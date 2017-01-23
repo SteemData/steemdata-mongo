@@ -23,7 +23,7 @@ class MongoStorage(object):
             self.Accounts = self.db['Accounts']
             self.Posts = self.db['Posts']
             self.Operations = self.db['Operations']
-            self.VirtualOperations = self.db['VirtualOperations']
+            self.AccountOperations = self.db['AccountOperations']
             self.PriceHistory = self.db['PriceHistory']
 
     def list_collections(self):
@@ -36,14 +36,15 @@ class MongoStorage(object):
     def ensure_indexes(self):
         self.Accounts.create_index('name', unique=True)
         self.Operations.create_index([('block_id', 1), ('type', 1), ('timestamp', -1)], unique=True)
+        self.Operations.create_index([('block_id', 1)])
         self.Operations.create_index([('type', 1)])
         self.Operations.create_index([('timestamp', -1)])
 
-        self.VirtualOperations.create_index([('index', 1), ('account', 1), ('type', 1), ('timestamp', -1)], unique=True)
-        self.VirtualOperations.create_index([('account', 1), ('type', 1)])
-        self.VirtualOperations.create_index([('account', 1)])
-        self.VirtualOperations.create_index([('type', 1)])
-        self.VirtualOperations.create_index([('timestamp', -1)])
+        self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1)], unique=True)
+        self.AccountOperations.create_index([('account', 1), ('type', 1)])
+        self.AccountOperations.create_index([('account', 1)])
+        self.AccountOperations.create_index([('type', 1)])
+        self.AccountOperations.create_index([('timestamp', -1)])
 
         self.Posts.create_index([('identifier', 1)], unique=True)
         self.Posts.create_index([('author', 1)])
