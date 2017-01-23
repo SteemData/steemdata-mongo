@@ -37,6 +37,7 @@ class MongoStorage(object):
         self.Accounts.create_index('name', unique=True)
         self.Operations.create_index([('block_id', 1), ('type', 1), ('timestamp', -1)], unique=True)
         self.Operations.create_index([('type', 1)])
+        self.Operations.create_index([('timestamp', -1)])
 
         self.VirtualOperations.create_index([('index', 1), ('account', 1), ('type', 1), ('timestamp', -1)], unique=True)
         self.VirtualOperations.create_index([('account', 1), ('type', 1)])
