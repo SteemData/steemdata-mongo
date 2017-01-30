@@ -126,7 +126,7 @@ def update_account(mongo, steem, username):
 def update_account_ops(mongo, steem, username):
     # check the highest index in the database
     start_index = 0
-    highest_index = list(mongo.VirtualOperations.find({'account': username}).
+    highest_index = list(mongo.AccountOperations.find({'account': username}).
                          sort("index", pymongo.DESCENDING).limit(1))
     if highest_index:
         start_index = highest_index[0].get('index', 0)
@@ -136,7 +136,7 @@ def update_account_ops(mongo, steem, username):
         with suppress(DuplicateKeyError):
             # parse fields
             event = {**event, 'timestamp': parse_time(event['timestamp'])}
-            mongo.VirtualOperations.insert_one(event)
+            mongo.AccountOperations.insert_one(event)
 
 
 def _fetch_comments_flat(root_post=None, comments=list(), all_comments=list()):

@@ -18,7 +18,7 @@ def run_worker(worker_name):
                              host=os.environ['DB_HOST'],
                              port=os.environ['DB_PORT'])
         mongo.ensure_indexes()
-        stm = Steem(node='ws://51.15.54.34:8090')
+        stm = Steem()
 
         try:
             if worker_name == "scrape_all_users":
