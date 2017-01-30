@@ -6,7 +6,6 @@ from pprint import pprint
 
 from steem import Steem
 
-from bitsports import refresh_bitsports
 from mongostorage import MongoStorage
 from scraper import scrape_all_users, scrape_operations, scrape_virtual_operations, \
     scrape_active_posts, scrape_misc, override
@@ -32,8 +31,6 @@ def run_worker(worker_name):
                 scrape_active_posts(mongo, stm)
             elif worker_name == "scrape_misc":
                 scrape_misc(mongo)
-            elif worker_name == "refresh_bitsports":
-                refresh_bitsports(mongo, stm)
             elif worker_name == "override":
                 override(mongo)
         except (KeyboardInterrupt, SystemExit):
@@ -65,7 +62,6 @@ def start_worker(argv):
         'scrape_virtual_operations',
         'scrape_active_posts',
         'scrape_misc',
-        'refresh_bitsports',
         'override',
     ]
     if worker not in workers:

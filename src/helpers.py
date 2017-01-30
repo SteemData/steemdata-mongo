@@ -2,7 +2,7 @@ import time
 from contextlib import contextmanager
 from datetime import datetime
 
-from steem.markets import Markets
+from steemdata.markets import Markets
 
 
 @contextmanager
