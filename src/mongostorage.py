@@ -45,10 +45,14 @@ class MongoStorage(object):
         self.AccountOperations.create_index([('account', 1)])
         self.AccountOperations.create_index([('type', 1)])
         self.AccountOperations.create_index([('timestamp', -1)])
+        self.AccountOperations.create_index([('index', -1)])
 
         self.Posts.create_index([('identifier', 1)], unique=True)
         self.Posts.create_index([('author', 1)])
+        self.Posts.create_index([('created', -1)])
         self.Posts.create_index([('body', 'text')], background=True)
+
+        self.PriceHistory.create_index([('timestamp', -1)])
 
 
 class Settings(object):
