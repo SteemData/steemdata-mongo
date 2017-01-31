@@ -12,14 +12,13 @@ from scraper import scrape_all_users, scrape_operations, scrape_virtual_operatio
 
 
 def run_worker(worker_name):
-    while True:
-        # init db
-        mongo = MongoStorage(db_name=os.environ['DB_NAME'],
-                             host=os.environ['DB_HOST'],
-                             port=os.environ['DB_PORT'])
-        mongo.ensure_indexes()
-        stm = Steem()
+    mongo = MongoStorage(db_name=os.environ['DB_NAME'],
+                         host=os.environ['DB_HOST'],
+                         port=os.environ['DB_PORT'])
+    mongo.ensure_indexes()
+    stm = Steem()
 
+    while True:
         try:
             if worker_name == "scrape_all_users":
                 scrape_all_users(mongo, stm)

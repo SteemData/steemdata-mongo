@@ -10,12 +10,11 @@ from scraper import scrape_all_users, scrape_operations, scrape_virtual_operatio
 
 
 def run_worker(worker_name):
-    while True:
-        # init
-        mongo = MongoStorage()
-        mongo.ensure_indexes()
-        stm = Steem()
+    mongo = MongoStorage()
+    mongo.ensure_indexes()
+    stm = Steem()
 
+    while True:
         try:
             if worker_name == "scrape_all_users":
                 scrape_all_users(mongo, stm)
