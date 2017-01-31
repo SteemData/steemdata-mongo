@@ -6,6 +6,7 @@ from funcy import flatten
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.account import Account
+from steem.exceptions import PostDoesNotExist
 from steem.post import Post
 from steem.utils import is_comment, parse_time
 from steemdata.blockchain import Blockchain, typify
@@ -111,15 +112,16 @@ def scrape_misc(mongo):
 
 
 def upsert_post(mongo, post_identifier, steem=None):
-    p = Post(post_identifier, steem_instance=steem)
+    with suppress(PostDoesNotExist):
+        p = Post(post_identifier, steem_instance=steem)
 
-    # scrape post and its replies
-    entry = {
-        **p.export(),
-        'replies': [],
-        # 'replies': [x.export() for x in _fetch_comments_flat(p)],
-    }
-    return mongo.Posts.update({'identifier': p.identifier}, entry, upsert=True)
+        # scrape post and its replies
+        entry = {
+            **p.export(),
+            'replies': [],
+            # 'replies': [x.export() for x in _fetch_comments_flat(p)],
+        }
+        return mongo.Posts.update({'identifier': p.identifier}, entry, upsert=True)
 
 
 def update_account(mongo, steem, username):
