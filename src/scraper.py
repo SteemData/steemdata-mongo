@@ -95,7 +95,7 @@ def scrape_active_posts(mongo, steem=None):
     """
     posts_cursor = mongo.Posts.find({'mode': {'$ne': 'archived'}}, no_cursor_timeout=True)
     posts_count = posts_cursor.count()
-    print('\n> Updating %s active posts...' % posts_count)
+    print('Updating %s active posts...' % posts_count)
     for post in posts_cursor:
         upsert_post(mongo, post['identifier'], steem=steem)
     posts_cursor.close()

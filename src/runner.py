@@ -1,4 +1,5 @@
 import multiprocessing
+import time
 import traceback
 from multiprocessing.pool import Pool
 
@@ -32,6 +33,9 @@ def run_worker(worker_name):
             print("EXCEPTION: %s():" % worker_name)
             print(traceback.format_exc())
 
+        # prevent IO overflow
+        time.sleep(5)
+
 
 if __name__ == '__main__':
     multiprocessing.set_start_method('spawn')
@@ -40,7 +44,7 @@ if __name__ == '__main__':
         'scrape_operations',
         'scrape_virtual_operations',
         'scrape_active_posts',
-        'scrape_misc',
+        # 'scrape_misc',
     ]
 
     with Pool(len(workers)) as p:
