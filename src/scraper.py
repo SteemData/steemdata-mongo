@@ -8,7 +8,7 @@ from steem import Steem
 from steem.account import Account
 from steem.exceptions import PostDoesNotExist
 from steem.post import Post
-from steem.utils import is_comment, parse_time
+from steem.utils import is_comment
 from steemdata.blockchain import Blockchain, typify
 
 from helpers import fetch_price_feed
@@ -127,7 +127,7 @@ def upsert_post(mongo, post_identifier, steem=None):
 
 def update_account(mongo, steem, username):
     a = Account(username, steem_instance=steem)
-    mongo.Accounts.update({'name': a.name}, a.export(), upsert=True)
+    mongo.Accounts.update({'name': a.name}, typify(a.export()), upsert=True)
 
 
 def update_account_ops(mongo, steem, username):
@@ -142,7 +142,7 @@ def update_account_ops(mongo, steem, username):
     for event in Account(username, steem_instance=steem).history(start=start_index):
         with suppress(DuplicateKeyError):
             # parse fields
-            event = {**event, 'timestamp': parse_time(event['timestamp'])}
+            event = typify(event)
             mongo.AccountOperations.insert_one(event)
 
 
