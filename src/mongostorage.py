@@ -62,11 +62,11 @@ class Settings(object):
         self.settings = self._settings.find_one()
 
         if not self.settings:
-            self._settings.insert_one(
-                {"last_block": 1},
-                {"account_index": 1},
-                {"virtual_op_index": 1},
-            )
+            self._settings.insert_one({
+                "last_block": 1,
+                "account_index": 1,
+                "virtual_op_index": 1,
+            })
             self.settings = self._settings.find_one()
 
     def last_block(self):

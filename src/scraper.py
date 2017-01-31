@@ -6,9 +6,9 @@ from funcy import flatten
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.account import Account
-from steem.blockchain import Blockchain
 from steem.post import Post
 from steem.utils import is_comment, parse_time
+from steemdata.blockchain import Blockchain, typify
 
 from helpers import fetch_price_feed
 from mongostorage import MongoStorage, Settings, Stats
@@ -56,7 +56,7 @@ def scrape_virtual_operations(mongo, steem=None):
 def scrape_operations(mongo, steem=None):
     """Fetch all operations from last known block forward."""
     settings = Settings(mongo)
-    blockchain = Blockchain(steem_instance=steem)
+    blockchain = Blockchain(mode="irreversible", steem_instance=steem)
     last_block = settings.last_block()
 
     history = blockchain.replay(
@@ -70,8 +70,12 @@ def scrape_operations(mongo, steem=None):
                 post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
                 upsert_post(mongo, post_identifier)
 
+        # if operation is a new account, add it to Accounts
+        if operation['type'] == 'account_create':
+            update_account(mongo, steem, operation['new_account_name'])
+
         # parse fields
-        operation = {**operation, 'timestamp': parse_time(operation['timestamp'])}
+        operation = typify(operation)
 
         # insert operation
         with suppress(DuplicateKeyError):
@@ -180,10 +184,11 @@ def get_usernames_batch(last_user=-1, steem=None):
 
 def override(mongo):
     """Various fixes to avoid re-scraping"""
-    for op in mongo.Operations.find({"timestamp": {'$type': "string"}}, no_cursor_timeout=True).limit(100000):
-        print("O: %s" % op['_id'])
-        if type(op['timestamp']) == str:
-            mongo.Operations.update_one({"_id": op['_id']}, {"$set": {"timestamp": parse_time(op['timestamp'])}})
+    return
+    # for op in mongo.Operations.find({"timestamp": {'$type': "string"}}, no_cursor_timeout=True).limit(100000):
+    #     print("O: %s" % op['_id'])
+    #     if type(op['timestamp']) == str:
+    #         mongo.Operations.update_one({"_id": op['_id']}, {"$set": {"timestamp": parse_time(op['timestamp'])}})
 
 
 def test():
@@ -191,8 +196,8 @@ def test():
     m.ensure_indexes()
     # scrape_misc(m)
     # scrape_all_users(m, Steem())
-    # scrape_operations(m)
-    scrape_virtual_operations(m)
+    scrape_operations(m)
+    # scrape_virtual_operations(m)
     # scrape_active_posts(m)
 
 

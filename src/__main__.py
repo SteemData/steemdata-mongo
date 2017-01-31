@@ -2,7 +2,6 @@ import getopt
 import os
 import sys
 import traceback
-from pprint import pprint
 
 from steem import Steem
 
@@ -37,7 +36,7 @@ def run_worker(worker_name):
             exit("Quitting...")
         except:
             print("EXCEPTION: %s():" % worker_name)
-            pprint(traceback.format_exc())
+            print(traceback.format_exc())
 
 
 def start_worker(argv):
