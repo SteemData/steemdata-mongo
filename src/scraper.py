@@ -30,6 +30,7 @@ def scrape_all_users(mongo, steem=None):
         s.set_account_checkpoint(username)
         print('Scraped account data for %s' % username)
 
+    # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
         s.set_account_checkpoint(-1)
 

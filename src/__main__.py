@@ -1,6 +1,7 @@
 import getopt
 import os
 import sys
+import time
 import traceback
 
 from steem import Steem
@@ -37,6 +38,9 @@ def run_worker(worker_name):
         except:
             print("EXCEPTION: %s():" % worker_name)
             print(traceback.format_exc())
+
+        # prevent IO overflow
+        time.sleep(5)
 
 
 def start_worker(argv):
