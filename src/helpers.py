@@ -1,10 +1,28 @@
-import time
-from contextlib import contextmanager
 from datetime import datetime
 
 from funcy import flatten
 from steem import Steem
+from steemdata.helpers import simple_cache, create_cache
 from steemdata.markets import Markets
+
+usernames_cache = create_cache()
+
+
+@simple_cache(usernames_cache, timeout=30 * 60)
+def refresh_username_list():
+    """
+    Only refresh username list every 30 minutes, otherwise return from cache.
+    """
+    return get_all_usernames()
+
+
+def extract_usernames_from_op(op):
+    """
+    Get a list of all STEEM users that were *likely* affected by the op.
+    """
+    usernames = refresh_username_list()
+    matches = [x for x in op.values() if x in usernames]
+    return list(set(matches))
 
 
 def fetch_comments_flat(root_post=None, comments=list(), all_comments=list()):
@@ -44,13 +62,6 @@ def get_usernames_batch(last_user=-1, steem=None):
         steem = Steem()
 
     return steem.rpc.lookup_accounts(last_user, 1000)
-
-
-@contextmanager
-def timeit():
-    t1 = time.time()
-    yield
-    print("Time Elapsed: %.2f" % (time.time() - t1))
 
 
 def fetch_price_feed():
