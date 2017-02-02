@@ -1,17 +1,14 @@
-import datetime as dt
 import time
 from contextlib import suppress
 
-import pymongo
 from pymongo.errors import DuplicateKeyError
-from steem.account import Account
-from steem.exceptions import PostDoesNotExist
-from steem.post import Post
 from steem.utils import is_comment
 from steemdata.blockchain import Blockchain, typify
 
-from helpers import fetch_price_feed, get_usernames_batch
+from helpers import fetch_price_feed, get_usernames_batch, extract_usernames_from_op
+from methods import update_account, update_account_ops, upsert_post
 from mongostorage import MongoStorage, Settings, Stats
+from tasks import update_account_async, update_post_async
 
 
 def scrape_all_users(mongo, steem=None):
@@ -46,22 +43,19 @@ def scrape_operations(mongo, steem=None):
     )
     print('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
-        # if operation is a main Post, update Posts collection
+        # if operation is a main Post, update it in background
         if operation['type'] == 'comment':
             if not operation['parent_author'] and not is_comment(operation):
                 post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
-                upsert_post(mongo, post_identifier)
+                update_post_async.delay(post_identifier)
 
-        # if operation is a new account, add it to Accounts
-        if operation['type'] == 'account_create':
-            update_account(mongo, steem, operation['new_account_name'])
-
-        # parse fields
-        operation = typify(operation)
+        # trigger an update for referenced accounts
+        for acc in extract_usernames_from_op(operation):
+            update_account_async.delay(acc)
 
         # insert operation
         with suppress(DuplicateKeyError):
-            mongo.Operations.insert_one(operation)
+            mongo.Operations.insert_one(typify(operation))
 
         # current block - 1 should become a new checkpoint
         if operation['block_num'] != last_block:
@@ -90,43 +84,6 @@ def scrape_misc(mongo):
         prices = fetch_price_feed()
         mongo.PriceHistory.insert_one(prices)
         time.sleep(60 * 60)
-
-
-def upsert_post(mongo, post_identifier, steem=None):
-    with suppress(PostDoesNotExist):
-        p = Post(post_identifier, steem_instance=steem)
-
-        # scrape post and its replies
-        entry = {
-            **p.export(),
-            'replies': [],
-            # 'replies': [x.export() for x in _fetch_comments_flat(p)],
-        }
-        return mongo.Posts.update({'identifier': p.identifier}, entry, upsert=True)
-
-
-def update_account(mongo, steem, username):
-    a = Account(username, steem_instance=steem)
-    account = {
-        **typify(a.export()),
-        "updatedAt": dt.datetime.utcnow(),
-    }
-    mongo.Accounts.update({'name': a.name}, account, upsert=True)
-
-
-def update_account_ops(mongo, steem, username, from_last_index=True):
-    # check the highest index in the database
-    start_index = 0
-    if from_last_index:
-        highest_index = list(mongo.AccountOperations.find({'account': username}).
-                             sort("index", pymongo.DESCENDING).limit(1))
-        if highest_index:
-            start_index = highest_index[0].get('index', 0)
-
-    # fetch missing records and update the db
-    for event in Account(username, steem_instance=steem).history(start=start_index):
-        with suppress(DuplicateKeyError):
-            mongo.AccountOperations.insert_one(typify(event))
 
 
 def override(mongo):

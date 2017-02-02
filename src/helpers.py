@@ -19,9 +19,11 @@ def refresh_username_list():
 def extract_usernames_from_op(op):
     """
     Get a list of all STEEM users that were *likely* affected by the op.
+    Warn: This method only looks into top level keys, and is somewhat obtuse.
     """
+    black_list = ['vote', 'follow', 'comment']
     usernames = refresh_username_list()
-    matches = [x for x in op.values() if x in usernames]
+    matches = [x for x in op.values() if x in usernames and x not in black_list]
     return list(set(matches))
 
 
