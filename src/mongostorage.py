@@ -65,7 +65,6 @@ class Settings(object):
             self._settings.insert_one({
                 "last_block": 1,
                 "account_index": 1,
-                "virtual_op_index": 1,
             })
             self.settings = self._settings.find_one()
 
@@ -80,12 +79,6 @@ class Settings(object):
 
     def set_account_checkpoint(self, index_num):
         return self._settings.update_one({}, {"$set": {'account_checkpoint': index_num}})
-
-    def virtual_op_checkpoint(self):
-        return self.settings.get('virtual_op_checkpoint', 1)
-
-    def set_virtual_op_checkpoint(self, username):
-        return self._settings.update_one({}, {"$set": {'virtual_op_checkpoint': username}})
 
 
 class Stats(object):

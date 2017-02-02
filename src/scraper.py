@@ -1,3 +1,4 @@
+import datetime as dt
 import time
 from contextlib import suppress
 
@@ -25,32 +26,13 @@ def scrape_all_users(mongo, steem=None):
 
     for username in usernames:
         update_account(mongo, steem, username)
+        update_account_ops(mongo, steem, username)
         s.set_account_checkpoint(username)
-        print('Scraped account data for %s' % username)
+        print('Updated @%s' % username)
 
     # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
         s.set_account_checkpoint(-1)
-
-
-def scrape_virtual_operations(mongo, steem=None):
-    """ Fetch all virtual operations for all users.
-    """
-    s = Settings(mongo)
-
-    virtual_op_checkpoint = s.virtual_op_checkpoint()
-    if virtual_op_checkpoint:
-        usernames = list(get_usernames_batch(virtual_op_checkpoint, steem))
-    else:
-        usernames = list(get_usernames_batch(steem))
-
-    for username in usernames:
-        update_account_ops(mongo, steem, username)
-        s.set_virtual_op_checkpoint(username)
-        print('Scraped virtual ops for %s' % username)
-
-    if virtual_op_checkpoint and len(usernames) < 1000:
-        s.set_virtual_op_checkpoint(-1)
 
 
 def scrape_operations(mongo, steem=None):
@@ -101,7 +83,7 @@ def scrape_active_posts(mongo, steem=None):
 
 
 def scrape_misc(mongo):
-    """Fetch prices and stuff...
+    """ Fetch prices and stuff...
     """
     while True:
         Stats(mongo).refresh()
@@ -125,23 +107,26 @@ def upsert_post(mongo, post_identifier, steem=None):
 
 def update_account(mongo, steem, username):
     a = Account(username, steem_instance=steem)
-    mongo.Accounts.update({'name': a.name}, typify(a.export()), upsert=True)
+    account = {
+        **typify(a.export()),
+        "updatedAt": dt.datetime.utcnow(),
+    }
+    mongo.Accounts.update({'name': a.name}, account, upsert=True)
 
 
-def update_account_ops(mongo, steem, username):
+def update_account_ops(mongo, steem, username, from_last_index=True):
     # check the highest index in the database
     start_index = 0
-    highest_index = list(mongo.AccountOperations.find({'account': username}).
-                         sort("index", pymongo.DESCENDING).limit(1))
-    if highest_index:
-        start_index = highest_index[0].get('index', 0)
+    if from_last_index:
+        highest_index = list(mongo.AccountOperations.find({'account': username}).
+                             sort("index", pymongo.DESCENDING).limit(1))
+        if highest_index:
+            start_index = highest_index[0].get('index', 0)
 
     # fetch missing records and update the db
     for event in Account(username, steem_instance=steem).history(start=start_index):
         with suppress(DuplicateKeyError):
-            # parse fields
-            event = typify(event)
-            mongo.AccountOperations.insert_one(event)
+            mongo.AccountOperations.insert_one(typify(event))
 
 
 def override(mongo):
