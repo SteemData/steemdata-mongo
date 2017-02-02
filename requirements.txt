@@ -1,3 +1,4 @@
+celery
 python-steem
 pymongo
 tqdm
