@@ -54,4 +54,4 @@ if __name__ == '__main__':
     ]
 
     with Pool(len(workers)) as p:
-        print(p.map(run_worker, workers))
+        p.map(run_worker, workers)
