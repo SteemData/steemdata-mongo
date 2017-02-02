@@ -2,6 +2,7 @@ from datetime import datetime
 
 from funcy import flatten
 from steem import Steem
+from steem.utils import remove_from_dict
 from steemdata.helpers import simple_cache, create_cache
 from steemdata.markets import Markets
 
@@ -19,11 +20,16 @@ def refresh_username_list():
 def extract_usernames_from_op(op):
     """
     Get a list of all STEEM users that were *likely* affected by the op.
-    Warn: This method only looks into top level keys, and is somewhat obtuse.
+    This method only looks into top level keys, and is somewhat obtuse.
+    Rather than filtering out irrevenant keys, it might be easier to look for known username containing keys,
+    however, we have no guarantees of schema immutability.
     """
-    black_list = ['vote', 'follow', 'comment']
     usernames = refresh_username_list()
-    matches = [x for x in op.values() if x in usernames and x not in black_list]
+
+    irrelevant_fields = ['type', 'block_num', 'permlink', 'timestamp', 'trx_id', 'weight', 'body', 'title',
+                         'props', 'work', 'json_metadata', 'json']
+    op_pruned = remove_from_dict(op, irrelevant_fields)
+    matches = [x for x in op_pruned.values() if type(x) == str and x in usernames]
     return list(set(matches))
 
 
