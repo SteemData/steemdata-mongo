@@ -49,9 +49,10 @@ def scrape_operations(mongo, steem=None):
                 post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
                 update_post_async.delay(post_identifier)
 
-        # trigger an update for referenced accounts
-        for acc in extract_usernames_from_op(operation):
-            update_account_async.delay(acc)
+        # if we are up to date, trigger an update for referenced accounts
+        if last_block > blockchain.get_current_block_num() - 100:
+            for acc in extract_usernames_from_op(operation):
+                update_account_async.delay(acc)
 
         # insert operation
         with suppress(DuplicateKeyError):
