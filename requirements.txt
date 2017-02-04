@@ -1,5 +1,6 @@
-celery
+celery[redis]
 python-steem
 pymongo
 tqdm
 funcy
+
