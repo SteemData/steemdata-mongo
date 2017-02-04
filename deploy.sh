@@ -1,5 +1,5 @@
 #!/bin/bash
 
-docker build -t mongosteem .
-docker tag mongosteem furion/mongosteem
-docker push furion/mongosteem
+docker build -t steemdata-mongo .
+docker tag steemdata-mongo furion/steemdata-mongo
+docker push furion/steemdata-mongo

@@ -12,6 +12,8 @@ RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/piston@1d
 RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/python-steem@9adf54c3538992a51b997c509b4f6ec273b5b68b
 RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/python-graphenelib@76b39e52e4284425b43eb35785be575aaa82f495
 
+# use local node
+RUN piston set node ws://steemd:8090
 
 WORKDIR /project_root/src
 CMD ["python", "__main__.py"]

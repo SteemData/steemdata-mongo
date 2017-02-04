@@ -23,7 +23,7 @@ def scrape_all_users(mongo, steem=None):
 
     for username in usernames:
         update_account(mongo, steem, username)
-        update_account_ops(mongo, steem, username)
+        update_account_ops(mongo, steem, username, from_last_index=False)
         s.set_account_checkpoint(username)
         print('Updated @%s' % username)
 
