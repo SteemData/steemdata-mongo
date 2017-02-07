@@ -41,7 +41,8 @@ class MongoStorage(object):
         self.Operations.create_index([('type', 1)])
         self.Operations.create_index([('timestamp', -1)])
 
-        self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1)], unique=True)
+        self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1), ('index', 1)], unique=True)
+        self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1)])
         self.AccountOperations.create_index([('account', 1), ('type', 1)])
         self.AccountOperations.create_index([('account', 1)])
         self.AccountOperations.create_index([('type', 1)])
