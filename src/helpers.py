@@ -24,6 +24,10 @@ def extract_usernames_from_op(op):
     Rather than filtering out irrevenant keys, it might be easier to look for known username containing keys,
     however, we have no guarantees of schema immutability.
     """
+    # votes and comments are too noisy (80% of operations)
+    if op['type'] in ['vote', 'comment']:
+        return []
+
     usernames = refresh_username_list()
 
     irrelevant_fields = ['type', 'block_num', 'permlink', 'timestamp', 'trx_id', 'weight', 'body', 'title',
