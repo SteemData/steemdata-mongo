@@ -2,6 +2,7 @@ import time
 from contextlib import suppress
 
 from pymongo.errors import DuplicateKeyError
+from steem import Steem
 from steem.utils import is_comment
 from steemdata.blockchain import Blockchain, typify
 
@@ -23,7 +24,7 @@ def scrape_all_users(mongo, steem=None):
 
     for username in usernames:
         update_account(mongo, steem, username)
-        update_account_ops(mongo, steem, username, from_last_index=False)
+        update_account_ops(mongo, steem, username)
         s.set_account_checkpoint(username)
         print('Updated @%s' % username)
 
@@ -101,7 +102,7 @@ def test():
     m.ensure_indexes()
     # scrape_misc(m)
     # scrape_all_users(m, Steem())
-    scrape_operations(m)
+    scrape_operations(m, Steem())
     # scrape_virtual_operations(m)
     # scrape_active_posts(m)
 
