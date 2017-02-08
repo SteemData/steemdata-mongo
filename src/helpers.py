@@ -24,8 +24,8 @@ def extract_usernames_from_op(op):
     Rather than filtering out irrevenant keys, it might be easier to look for known username containing keys,
     however, we have no guarantees of schema immutability.
     """
-    # votes and comments are too noisy (80% of operations)
-    if op['type'] in ['vote', 'comment']:
+    # votes and comments are too noisy (92% of operations)
+    if op['type'] in ['vote', 'comment', 'custom_json', 'curation_reward']:
         return []
 
     usernames = refresh_username_list()
@@ -34,7 +34,9 @@ def extract_usernames_from_op(op):
                          'props', 'work', 'json_metadata', 'json']
     op_pruned = remove_from_dict(op, irrelevant_fields)
     matches = [x for x in op_pruned.values() if type(x) == str and x in usernames]
-    return list(set(matches))
+
+    # remove users with operation like usernames
+    return list(set(matches) - {'follow', 'comment', 'vote', 'pow', 'pow2', 'transfer'})
 
 
 def fetch_comments_flat(root_post=None, comments=list(), all_comments=list()):
