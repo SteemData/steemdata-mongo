@@ -32,6 +32,7 @@ def update_account(mongo, steem, username, min_age=60):
     a = Account(username, steem_instance=steem)
     account = {
         **typify(a.export()),
+        'account': username,
         'updatedAt': dt.datetime.utcnow(),
     }
     mongo.Accounts.update({'name': a.name}, account, upsert=True)
