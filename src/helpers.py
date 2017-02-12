@@ -25,7 +25,7 @@ def extract_usernames_from_op(op):
     however, we have no guarantees of schema immutability.
     """
     # votes and comments are too noisy (92% of operations)
-    if op['type'] in ['vote', 'comment', 'custom_json', 'curation_reward']:
+    if op['type'] in ['vote', 'custom_json', 'curation_reward']:
         return []
 
     usernames = refresh_username_list()
