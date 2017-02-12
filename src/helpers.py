@@ -82,10 +82,10 @@ def fetch_price_feed():
     m = Markets()
     return {
         "timestamp": datetime.utcnow(),
-        "btc_usd": float("%.4f" % m.btc_usd()),
-        "steem_btc": float("%.8f" % m.steem_btc()),
-        "sbd_btc": float("%.8f" % m.sbd_btc()),
-        "steem_sbd_implied": float("%.4f" % m.steem_sbd_implied()),
-        "steem_usd_implied": float("%.4f" % m.steem_usd_implied()),
-        "sbd_usd_implied": float("%.4f" % m.sbd_usd_implied()),
+        "btc_usd": round(m.btc_usd(), 8),
+        "steem_btc": round(m.steem_btc(), 8),
+        "sbd_btc": round(m.sbd_btc(), 8),
+        "steem_sbd_implied": round(m.steem_sbd_implied(), 6),
+        "steem_usd_implied": round(m.steem_usd_implied(), 6),
+        "sbd_usd_implied": round(m.sbd_usd_implied(), 6),
     }
