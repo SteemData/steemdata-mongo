@@ -40,6 +40,12 @@ class MongoStorage(object):
         self.Operations.create_index([('block_id', 1)])
         self.Operations.create_index([('type', 1)])
         self.Operations.create_index([('timestamp', -1)])
+        # partial indexes
+        self.Operations.create_index([('author', 1), ('permlink', 1)], sparse=True, background=True)
+        self.Operations.create_index([('to', 1)], sparse=True, background=True)
+        self.Operations.create_index([('from', 1)], sparse=True, background=True)
+        self.Operations.create_index([('memo', 1)],
+                                     partialFilterExpression={'type': 'transfer'}, background=True)
 
         self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1), ('index', 1)], unique=True)
         self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1)])
