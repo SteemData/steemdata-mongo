@@ -78,11 +78,16 @@ def scrape_active_posts(mongo, steem=None):
     posts_cursor.close()
 
 
-def scrape_misc(mongo):
-    """ Fetch prices and stuff...
-    """
+def refresh_dbstats(mongo):
     while True:
         Stats(mongo).refresh()
+        time.sleep(60)
+
+
+def scrape_prices(mongo):
+    """ Update PriceHistory every hour.
+    """
+    while True:
         prices = fetch_price_feed()
         mongo.PriceHistory.insert_one(prices)
         time.sleep(60 * 60)

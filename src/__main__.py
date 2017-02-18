@@ -24,7 +24,8 @@ def start_worker(argv):
         'scrape_all_users',
         'scrape_operations',
         'scrape_active_posts',
-        'scrape_misc',
+        'scrape_prices',
+        'refresh_dbstats',
         'override',
     ]
     if worker not in workers:

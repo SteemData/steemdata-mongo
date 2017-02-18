@@ -11,8 +11,10 @@ from scraper import (
     scrape_all_users,
     scrape_operations,
     scrape_active_posts,
-    scrape_misc,
-    override)
+    scrape_prices,
+    override,
+    refresh_dbstats,
+)
 
 
 def run_worker(worker_name):
@@ -30,8 +32,10 @@ def run_worker(worker_name):
                 scrape_operations(mongo, stm)
             elif worker_name == "scrape_active_posts":
                 scrape_active_posts(mongo, stm)
-            elif worker_name == "scrape_misc":
-                scrape_misc(mongo)
+            elif worker_name == "scrape_prices":
+                scrape_prices(mongo)
+            elif worker_name == "refresh_dbstats":
+                refresh_dbstats(mongo)
             elif worker_name == "override":
                 override(mongo)
         except (KeyboardInterrupt, SystemExit):
@@ -50,6 +54,7 @@ if __name__ == '__main__':
         'scrape_all_users',
         'scrape_operations',
         'scrape_active_posts',
+        'scrape_prices',
         # 'scrape_misc',
     ]
 
