@@ -31,7 +31,7 @@ def extract_usernames_from_op(op):
     usernames = refresh_username_list()
 
     irrelevant_fields = ['type', 'block_num', 'permlink', 'timestamp', 'trx_id', 'weight', 'body', 'title',
-                         'props', 'work', 'json_metadata', 'json']
+                         'props', 'work', 'json_metadata', 'json', 'memo']
     op_pruned = remove_from_dict(op, irrelevant_fields)
     matches = [x for x in op_pruned.values() if type(x) == str and x in usernames]
 
