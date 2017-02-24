@@ -22,19 +22,16 @@ def upsert_post(mongo, post_identifier, steem=None):
         return mongo.Posts.update({'identifier': p.identifier}, entry, upsert=True)
 
 
-def update_account(mongo, steem, username, min_age=60):
-    """ Update Account. If minimum refresh age is not reached, skip the update."""
-    if min_age:
-        acc = mongo.Accounts.find_one({'name': username}, {'_id': 0, 'updatedAt': 1})
-        if acc and acc['updatedAt'] > (dt.datetime.utcnow() - dt.timedelta(seconds=min_age)):
-            return
-
+def update_account(mongo, steem, username, load_extras=True):
+    """ Update Account. If load_extras """
     a = Account(username, steem_instance=steem)
     account = {
-        **typify(a.export()),
+        **typify(a.export(load_extras=load_extras)),
         'account': username,
         'updatedAt': dt.datetime.utcnow(),
     }
+    if not load_extras:
+        account = {'$set': account}
     mongo.Accounts.update({'name': a.name}, account, upsert=True)
 
 

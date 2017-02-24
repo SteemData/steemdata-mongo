@@ -5,6 +5,7 @@ from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.utils import is_comment
 from steemdata.blockchain import Blockchain, typify
+from steemdata.helpers import timeit
 
 from helpers import fetch_price_feed, get_usernames_batch, extract_usernames_from_op
 from methods import update_account, update_account_ops, upsert_post
@@ -23,7 +24,7 @@ def scrape_all_users(mongo, steem=None):
         usernames = list(get_usernames_batch(steem))
 
     for username in usernames:
-        update_account(mongo, steem, username)
+        update_account(mongo, steem, username, load_extras=True)
         update_account_ops(mongo, steem, username)
         s.set_account_checkpoint(username)
         print('Updated @%s' % username)
@@ -125,11 +126,13 @@ def override(mongo):
 
 def test():
     m = MongoStorage()
-    m.ensure_indexes()
+    with timeit():
+        update_account(m, Steem(), 'furion', load_extras=False)
+    # m.ensure_indexes()
     # scrape_misc(m)
     # scrape_all_users(m, Steem())
     # validate_operations(m)
-    scrape_operations(m, Steem())
+    # scrape_operations(m, Steem())
     # scrape_virtual_operations(m)
     # scrape_active_posts(m)
 

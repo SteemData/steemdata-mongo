@@ -19,7 +19,7 @@ stm = Steem()
 
 @app.task
 def update_account_async(account_name):
-    update_account(mongo, stm, account_name)
+    update_account(mongo, stm, account_name, load_extras=False)
     update_account_ops_quick(mongo, stm, account_name)
 
 
