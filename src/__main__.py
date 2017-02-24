@@ -21,8 +21,9 @@ def start_worker(argv):
             pass
 
     workers = [
-        'scrape_all_users',
         'scrape_operations',
+        'validate_operations',
+        'scrape_all_users',
         'scrape_active_posts',
         'scrape_prices',
         'refresh_dbstats',

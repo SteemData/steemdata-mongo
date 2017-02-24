@@ -14,6 +14,7 @@ from scraper import (
     scrape_prices,
     override,
     refresh_dbstats,
+    validate_operations,
 )
 
 
@@ -28,6 +29,8 @@ def run_worker(worker_name):
             if worker_name == "scrape_operations":
                 mongo.ensure_indexes()
                 scrape_operations(mongo, stm)
+            elif worker_name == "validate_operations":
+                validate_operations(mongo, stm)
             elif worker_name == "scrape_all_users":
                 scrape_all_users(mongo, stm)
             elif worker_name == "scrape_active_posts":

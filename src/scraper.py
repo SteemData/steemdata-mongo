@@ -2,7 +2,6 @@ import time
 from contextlib import suppress
 
 from pymongo.errors import DuplicateKeyError
-from steem import Steem
 from steem.utils import is_comment
 from steemdata.blockchain import Blockchain, typify
 
@@ -67,6 +66,24 @@ def scrape_operations(mongo, steem=None):
         print("%s: #%s" % (operation['timestamp'], operation['block_num']))
 
 
+def validate_operations(mongo, steem=None):
+    """ Scan each block in db and validate its operations for consistency reasons. """
+    blockchain = Blockchain(mode="irreversible", steem_instance=steem)
+    highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
+
+    for block_num in range(highest_block, 1, -1):
+        print('Validating block #%s' % block_num)
+        block = list(blockchain.stream(start=block_num, stop=block_num))
+
+        # remove all invalid or changed operations
+        mongo.Operations.delete_many({'block_num': block_num, '_id': {'$nin': [x['_id'] for x in block]}})
+
+        # insert any missing operations
+        for op in block:
+            with suppress(DuplicateKeyError):
+                mongo.Operations.insert_one(typify(op))
+
+
 def scrape_active_posts(mongo, steem=None):
     """ Update all non-archived posts.
     """
@@ -107,7 +124,8 @@ def test():
     m.ensure_indexes()
     # scrape_misc(m)
     # scrape_all_users(m, Steem())
-    scrape_operations(m, Steem())
+    validate_operations(m)
+    # scrape_operations(m, Steem())
     # scrape_virtual_operations(m)
     # scrape_active_posts(m)
 
