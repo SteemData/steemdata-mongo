@@ -2,6 +2,7 @@ import time
 from contextlib import suppress
 
 from pymongo.errors import DuplicateKeyError
+from steem import Steem
 from steem.utils import is_comment
 from steemdata.blockchain import Blockchain, typify
 
@@ -63,7 +64,8 @@ def scrape_operations(mongo, steem=None):
             last_block = operation['block_num']
             settings.update_last_block(last_block - 1)
 
-        print("%s: #%s" % (operation['timestamp'], operation['block_num']))
+            if last_block % 10 == 0:
+                print("#%s: %s" % (last_block, time.ctime()))
 
 
 def validate_operations(mongo, steem=None):
@@ -72,7 +74,8 @@ def validate_operations(mongo, steem=None):
     highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
 
     for block_num in range(highest_block, 1, -1):
-        print('Validating block #%s' % block_num)
+        if block_num % 10 == 0:
+            print('Validating block #%s' % block_num)
         block = list(blockchain.stream(start=block_num, stop=block_num))
 
         # remove all invalid or changed operations
@@ -121,12 +124,12 @@ def override(mongo):
 
 
 def test():
-    m = MongoStorage(host='server:EZ9pBBzqRrSJGCrd2@mongo1.steemdata.com')
-    # m.ensure_indexes()
+    m = MongoStorage()
+    m.ensure_indexes()
     # scrape_misc(m)
     # scrape_all_users(m, Steem())
-    validate_operations(m)
-    # scrape_operations(m, Steem())
+    # validate_operations(m)
+    scrape_operations(m, Steem())
     # scrape_virtual_operations(m)
     # scrape_active_posts(m)
 
