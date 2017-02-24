@@ -76,7 +76,8 @@ def validate_operations(mongo, steem=None):
         block = list(blockchain.stream(start=block_num, stop=block_num))
 
         # remove all invalid or changed operations
-        mongo.Operations.delete_many({'block_num': block_num, '_id': {'$nin': [x['_id'] for x in block]}})
+        conditions = {'block_num': block_num, '_id': {'$nin': [x['_id'] for x in block]}}
+        mongo.Operations.delete_many(conditions)
 
         # insert any missing operations
         for op in block:
@@ -120,8 +121,8 @@ def override(mongo):
 
 
 def test():
-    m = MongoStorage()
-    m.ensure_indexes()
+    m = MongoStorage(host='server:EZ9pBBzqRrSJGCrd2@mongo1.steemdata.com')
+    # m.ensure_indexes()
     # scrape_misc(m)
     # scrape_all_users(m, Steem())
     validate_operations(m)
