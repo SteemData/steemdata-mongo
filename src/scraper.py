@@ -90,7 +90,7 @@ def scrape_prices(mongo):
     while True:
         prices = fetch_price_feed()
         mongo.PriceHistory.insert_one(prices)
-        time.sleep(60 * 60)
+        time.sleep(60 * 5)
 
 
 def override(mongo):
