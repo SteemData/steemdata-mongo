@@ -21,15 +21,15 @@ def run_worker(worker_name):
     mongo = MongoStorage(db_name=os.getenv('DB_NAME', DB_NAME),
                          host=os.getenv('DB_HOST', MONGO_HOST),
                          port=os.getenv('DB_PORT', MONGO_PORT))
-    mongo.ensure_indexes()
     stm = Steem()
 
     while True:
         try:
-            if worker_name == "scrape_all_users":
-                scrape_all_users(mongo, stm)
-            elif worker_name == "scrape_operations":
+            if worker_name == "scrape_operations":
+                mongo.ensure_indexes()
                 scrape_operations(mongo, stm)
+            elif worker_name == "scrape_all_users":
+                scrape_all_users(mongo, stm)
             elif worker_name == "scrape_active_posts":
                 scrape_active_posts(mongo, stm)
             elif worker_name == "scrape_prices":
