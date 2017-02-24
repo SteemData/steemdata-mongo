@@ -8,8 +8,8 @@ ENV UNLOCK foo
 
 RUN pip install -r requirements.txt
 
-RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/piston@1d8d5b80df0ad48515260742d8f9cf6dd61e2739
-RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/python-steem@9adf54c3538992a51b997c509b4f6ec273b5b68b
+RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/piston@b912147475550ad1031b54d412dac44910b2a6a1
+RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/python-steem@93a77344546fef584070c45de9a5bfd0e9d0f4ac
 RUN pip install --upgrade --force-reinstall git+git://github.com/xeroc/python-graphenelib@76b39e52e4284425b43eb35785be575aaa82f495
 
 # use local node
