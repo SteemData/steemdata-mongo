@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from funcy import flatten
+from funcy.seqs import flatten
 from steem import Steem
 from steem.utils import remove_from_dict
 from steemdata.helpers import simple_cache, create_cache
@@ -62,10 +62,10 @@ def get_all_usernames(last_user=-1, steem=None):
     if not steem:
         steem = Steem()
 
-    usernames = steem.rpc.lookup_accounts(last_user, 1000)
+    usernames = steem.lookup_accounts(last_user, 1000)
     batch = []
     while len(batch) != 1:
-        batch = steem.rpc.lookup_accounts(usernames[-1], 1000)
+        batch = steem.lookup_accounts(usernames[-1], 1000)
         usernames += batch[1:]
 
     return usernames
@@ -75,7 +75,7 @@ def get_usernames_batch(last_user=-1, steem=None):
     if not steem:
         steem = Steem()
 
-    return steem.rpc.lookup_accounts(last_user, 1000)
+    return steem.lookup_accounts(last_user, 1000)
 
 
 def fetch_price_feed():

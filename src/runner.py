@@ -4,8 +4,6 @@ import time
 import traceback
 from multiprocessing.pool import Pool
 
-from steem import Steem
-
 from mongostorage import MongoStorage, MONGO_HOST, DB_NAME, MONGO_PORT
 from scraper import (
     scrape_all_users,
@@ -22,19 +20,18 @@ def run_worker(worker_name):
     mongo = MongoStorage(db_name=os.getenv('DB_NAME', DB_NAME),
                          host=os.getenv('DB_HOST', MONGO_HOST),
                          port=os.getenv('DB_PORT', MONGO_PORT))
-    stm = Steem()
 
     while True:
         try:
             if worker_name == "scrape_operations":
                 mongo.ensure_indexes()
-                scrape_operations(mongo, stm)
+                scrape_operations(mongo)
             elif worker_name == "validate_operations":
-                validate_operations(mongo, stm)
+                validate_operations(mongo)
             elif worker_name == "scrape_all_users":
-                scrape_all_users(mongo, stm)
+                scrape_all_users(mongo)
             elif worker_name == "scrape_active_posts":
-                scrape_active_posts(mongo, stm)
+                scrape_active_posts(mongo)
             elif worker_name == "scrape_prices":
                 scrape_prices(mongo)
             elif worker_name == "refresh_dbstats":

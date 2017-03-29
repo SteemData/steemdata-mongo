@@ -13,8 +13,9 @@ from mongostorage import MongoStorage, Settings, Stats
 from tasks import update_account_async, update_post_async
 
 
-def scrape_all_users(mongo, steem=None):
+def scrape_all_users(mongo):
     """Scrape all existing users and insert/update their entries in Accounts collection."""
+    steem = Steem()
     s = Settings(mongo)
 
     account_checkpoint = s.account_checkpoint()
@@ -24,8 +25,8 @@ def scrape_all_users(mongo, steem=None):
         usernames = list(get_usernames_batch(steem))
 
     for username in usernames:
-        update_account(mongo, steem, username, load_extras=True)
-        update_account_ops(mongo, steem, username)
+        update_account(mongo, username, load_extras=True)
+        update_account_ops(mongo, username)
         s.set_account_checkpoint(username)
         print('Updated @%s' % username)
 
@@ -34,10 +35,10 @@ def scrape_all_users(mongo, steem=None):
         s.set_account_checkpoint(-1)
 
 
-def scrape_operations(mongo, steem=None):
+def scrape_operations(mongo):
     """Fetch all operations from last known block forward."""
     settings = Settings(mongo)
-    blockchain = Blockchain(mode="irreversible", steem_instance=steem)
+    blockchain = Blockchain(mode="irreversible")
     last_block = settings.last_block()
 
     history = blockchain.replay(
@@ -69,9 +70,9 @@ def scrape_operations(mongo, steem=None):
                 print("#%s: %s" % (last_block, time.ctime()))
 
 
-def validate_operations(mongo, steem=None):
+def validate_operations(mongo):
     """ Scan each block in db and validate its operations for consistency reasons. """
-    blockchain = Blockchain(mode="irreversible", steem_instance=steem)
+    blockchain = Blockchain(mode="irreversible")
     highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
 
     for block_num in range(highest_block, 1, -1):
@@ -89,14 +90,14 @@ def validate_operations(mongo, steem=None):
                 mongo.Operations.insert_one(typify(op))
 
 
-def scrape_active_posts(mongo, steem=None):
+def scrape_active_posts(mongo):
     """ Update all non-archived posts.
     """
     posts_cursor = mongo.Posts.find({'mode': {'$ne': 'archived'}}, no_cursor_timeout=True)
     posts_count = posts_cursor.count()
     print('Updating %s active posts...' % posts_count)
     for post in posts_cursor:
-        upsert_post(mongo, post['identifier'], steem=steem)
+        upsert_post(mongo, post['identifier'])
     posts_cursor.close()
 
 
@@ -127,14 +128,14 @@ def override(mongo):
 def test():
     m = MongoStorage()
     with timeit():
-        update_account(m, Steem(), 'furion', load_extras=False)
-    # m.ensure_indexes()
-    # scrape_misc(m)
-    # scrape_all_users(m, Steem())
-    # validate_operations(m)
-    # scrape_operations(m, Steem())
-    # scrape_virtual_operations(m)
-    # scrape_active_posts(m)
+        update_account(m, 'furion', load_extras=False)
+        # m.ensure_indexes()
+        # scrape_misc(m)
+        # scrape_all_users(m, Steem())
+        # validate_operations(m)
+        # scrape_operations(m, Steem())
+        # scrape_virtual_operations(m)
+        # scrape_active_posts(m)
 
 
 if __name__ == '__main__':
