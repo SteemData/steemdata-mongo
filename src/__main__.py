@@ -24,7 +24,6 @@ def start_worker(argv):
         'scrape_operations',
         'validate_operations',
         'scrape_all_users',
-        'scrape_active_posts',
         'scrape_prices',
         'refresh_dbstats',
         'override',

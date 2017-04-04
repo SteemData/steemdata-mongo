@@ -2,7 +2,7 @@ import os
 
 from celery import Celery
 
-from methods import update_account, upsert_post, update_account_ops_quick
+from methods import update_account, upsert_post, update_account_ops_quick, upsert_comment
 from mongostorage import MongoStorage, DB_NAME, MONGO_HOST, MONGO_PORT
 
 app = Celery('tasks',
@@ -22,5 +22,8 @@ def update_account_async(account_name):
 
 
 @app.task
-def update_post_async(post_identifier):
-    upsert_post(mongo, post_identifier)
+def update_post_async(post_identifier, comment_type='post'):
+    if comment_type == 'post':
+        upsert_post(mongo, post_identifier)
+    elif comment_type == 'comment':
+        upsert_comment(mongo, post_identifier)

@@ -1,6 +1,5 @@
 from datetime import datetime
 
-from funcy.seqs import flatten
 from steem import Steem
 from steem.utils import remove_from_dict
 from steemdata.helpers import simple_cache, create_cache
@@ -39,23 +38,23 @@ def extract_usernames_from_op(op):
     return list(set(matches) - {'follow', 'comment', 'vote', 'pow', 'pow2', 'transfer'})
 
 
-def fetch_comments_flat(root_post=None, comments=list(), all_comments=list()):
-    """
-    Recursively fetch all the child comments, and return them as a list.
-
-    Usage: all_comments = fetch_comments_flat(Post('@foo/bar'))
-    """
-    # see if our root post has any comments
-    if root_post:
-        return fetch_comments_flat(comments=root_post.get_comments())
-    if not comments:
-        return all_comments
-
-    # recursively scrape children one depth layer at a time
-    children = list(flatten([x.get_comments() for x in comments]))
-    if not children:
-        return all_comments
-    return fetch_comments_flat(all_comments=comments + children, comments=children)
+# def fetch_comments_flat(root_post=None, comments=list(), all_comments=list()):
+#     """
+#     Recursively fetch all the child comments, and return them as a list.
+#
+#     Usage: all_comments = fetch_comments_flat(Post('@foo/bar'))
+#     """
+#     # see if our root post has any comments
+#     if root_post:
+#         return fetch_comments_flat(comments=root_post.get_comments())
+#     if not comments:
+#         return all_comments
+#
+#     # recursively scrape children one depth layer at a time
+#     children = list(flatten([x.get_comments() for x in comments]))
+#     if not children:
+#         return all_comments
+#     return fetch_comments_flat(all_comments=comments + children, comments=children)
 
 
 def get_all_usernames(last_user=-1, steem=None):

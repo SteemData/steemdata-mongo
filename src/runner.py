@@ -8,7 +8,6 @@ from mongostorage import MongoStorage, MONGO_HOST, DB_NAME, MONGO_PORT
 from scraper import (
     scrape_all_users,
     scrape_operations,
-    scrape_active_posts,
     scrape_prices,
     override,
     refresh_dbstats,
@@ -30,8 +29,6 @@ def run_worker(worker_name):
                 validate_operations(mongo)
             elif worker_name == "scrape_all_users":
                 scrape_all_users(mongo)
-            elif worker_name == "scrape_active_posts":
-                scrape_active_posts(mongo)
             elif worker_name == "scrape_prices":
                 scrape_prices(mongo)
             elif worker_name == "refresh_dbstats":
@@ -39,7 +36,8 @@ def run_worker(worker_name):
             elif worker_name == "override":
                 override(mongo)
         except (KeyboardInterrupt, SystemExit):
-            exit("Quitting...")
+            print("Quitting...")
+            exit(0)
         except:
             print("EXCEPTION: %s():" % worker_name)
             print(traceback.format_exc())
@@ -53,7 +51,6 @@ if __name__ == '__main__':
     workers = [
         'scrape_all_users',
         'scrape_operations',
-        'scrape_active_posts',
         'scrape_prices',
         # 'scrape_misc',
     ]

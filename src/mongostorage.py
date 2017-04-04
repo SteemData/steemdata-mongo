@@ -22,6 +22,7 @@ class MongoStorage(object):
         else:
             self.Accounts = self.db['Accounts']
             self.Posts = self.db['Posts']
+            self.Comments = self.db['Comments']
             self.Operations = self.db['Operations']
             self.AccountOperations = self.db['AccountOperations']
             self.PriceHistory = self.db['PriceHistory']
@@ -36,6 +37,7 @@ class MongoStorage(object):
     def ensure_indexes(self):
         self.Accounts.create_index('name', unique=True)
 
+        # Operations are using _id as unique index
         self.Operations.create_index([('type', 1), ('timestamp', -1)])
         self.Operations.create_index([('block_id', 1)])
         self.Operations.create_index([('type', 1)])
@@ -51,7 +53,7 @@ class MongoStorage(object):
         # }
         # self.Operations.create_index([('memo', 1)], partialFilterExpression=memo_condition, background=True)
 
-        self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1), ('index', 1)], unique=True)
+        # AccountOperations are using _id as unique index
         self.AccountOperations.create_index([('account', 1), ('type', 1), ('timestamp', -1)])
         self.AccountOperations.create_index([('account', 1), ('type', 1)])
         self.AccountOperations.create_index([('account', 1)])
@@ -61,8 +63,17 @@ class MongoStorage(object):
 
         self.Posts.create_index([('identifier', 1)], unique=True)
         self.Posts.create_index([('author', 1)])
+        self.Posts.create_index([('permlink', 1)])
         self.Posts.create_index([('created', -1)])
         self.Posts.create_index([('body', 'text')], background=True)
+
+        self.Comments.create_index([('identifier', 1)], unique=True)
+        self.Comments.create_index([('parent_author', 1)])
+        self.Comments.create_index([('parent_permlink', 1)])
+        self.Comments.create_index([('author', 1)])
+        self.Comments.create_index([('permlink', 1)])
+        self.Comments.create_index([('created', -1)])
+        self.Comments.create_index([('body', 'text')], background=True)
 
         self.PriceHistory.create_index([('timestamp', -1)])
 
