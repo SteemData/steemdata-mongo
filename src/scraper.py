@@ -1,6 +1,7 @@
 import time
 from contextlib import suppress
 
+from funcy.colls import pluck
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.utils import is_comment
@@ -8,7 +9,7 @@ from steemdata.blockchain import Blockchain, typify
 from steemdata.helpers import timeit
 
 from helpers import fetch_price_feed, get_usernames_batch, extract_usernames_from_op
-from methods import update_account, update_account_ops
+from methods import update_account, update_account_ops, upsert_post, upsert_comment
 from mongostorage import MongoStorage, Settings, Stats
 from tasks import update_account_async, update_post_async
 
@@ -109,6 +110,14 @@ def scrape_prices(mongo):
 
 def override(mongo):
     """Various fixes to avoid re-scraping"""
+    # fix posts
+    broken_posts = mongo.Posts.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
+    for identifier in pluck('identifier', broken_posts):
+        upsert_post(mongo, identifier)
+
+    broken_comments = mongo.Comments.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
+    for identifier in pluck('identifier', broken_comments):
+        upsert_comment(mongo, identifier)
     time.sleep(3600)
 
 

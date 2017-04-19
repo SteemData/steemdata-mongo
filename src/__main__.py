@@ -29,7 +29,8 @@ def start_worker(argv):
         'override',
     ]
     if worker not in workers:
-        quit("ERROR: Invalid or no worker specified!")
+        print("ERROR: Invalid or no worker specified!")
+        quit(1)
 
     run_worker(worker)
 
