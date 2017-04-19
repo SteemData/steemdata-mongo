@@ -1,12 +1,14 @@
+import json
 import time
 from contextlib import suppress
 
 from funcy.colls import pluck
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
+from steem.blockchain import Blockchain
 from steem.utils import is_comment
-from steemdata.blockchain import Blockchain, typify
 from steemdata.helpers import timeit
+from steemdata.utils import json_expand, typify
 
 from helpers import fetch_price_feed, get_usernames_batch, extract_usernames_from_op
 from methods import update_account, update_account_ops, upsert_post, upsert_comment
@@ -62,7 +64,7 @@ def scrape_operations(mongo):
 
         # insert operation
         with suppress(DuplicateKeyError):
-            mongo.Operations.insert_one(typify(operation))
+            mongo.Operations.insert_one(json_expand(typify(operation)))
 
         # current block - 1 should become a new checkpoint
         if operation['block_num'] != last_block:
@@ -90,7 +92,7 @@ def validate_operations(mongo):
         # insert any missing operations
         for op in block:
             with suppress(DuplicateKeyError):
-                mongo.Operations.insert_one(typify(op))
+                mongo.Operations.insert_one(json_expand(typify(op)))
 
 
 def refresh_dbstats(mongo):
@@ -110,29 +112,45 @@ def scrape_prices(mongo):
 
 def override(mongo):
     """Various fixes to avoid re-scraping"""
-    # fix posts
+    # # fix posts
     broken_posts = mongo.Posts.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
     for identifier in pluck('identifier', broken_posts):
         upsert_post(mongo, identifier)
 
+    # fix comments
     broken_comments = mongo.Comments.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
     for identifier in pluck('identifier', broken_comments):
         upsert_comment(mongo, identifier)
-    time.sleep(3600)
+
+    # fix custom_json
+    for op in mongo.Operations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
+        if type(op['json']) != str:
+            continue
+        with suppress(TypeError):
+            mongo.Operations.update(op, {'$set': {'json': json.loads(op['json'])}})
+    for op in mongo.AccountOperations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
+        if type(op['json']) != str:
+            continue
+        with suppress(TypeError):
+            mongo.AccountOperations.update(op, {'$set': {'json': json.loads(op['json'])}})
+
+    # dont hog the loop
+    time.sleep(600)
 
 
-def test():
+def run():
     m = MongoStorage()
     with timeit():
-        update_account(m, 'furion', load_extras=False)
+        # update_account(m, 'furion', load_extras=False)
         # m.ensure_indexes()
         # scrape_misc(m)
         # scrape_all_users(m, Steem())
         # validate_operations(m)
-        # scrape_operations(m, Steem())
+        override(m)
+        # scrape_operations(m)
         # scrape_virtual_operations(m)
         # scrape_active_posts(m)
 
 
 if __name__ == '__main__':
-    test()
+    run()

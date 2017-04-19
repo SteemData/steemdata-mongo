@@ -7,7 +7,7 @@ from pymongo.errors import DuplicateKeyError
 from steem.account import Account
 from steem.post import Post
 from steembase.exceptions import PostDoesNotExist
-from steemdata.blockchain import typify
+from steemdata.utils import typify, json_expand
 
 
 def upsert_post(mongo, post_identifier):
@@ -23,7 +23,14 @@ def upsert_comment(mongo, post_identifier):
 
 
 def update_account(mongo, username, load_extras=True):
-    """ Update Account. If load_extras """
+    """ Update Account. 
+    
+    If load_extras is True, update:
+     - followers, followings
+     - curation stats
+     - withdrawal routers, conversion requests
+
+    """
     a = Account(username)
     account = {
         **typify(a.export(load_extras=load_extras)),
@@ -39,7 +46,7 @@ def update_account_ops(mongo, username):
     """ This method will fetch entire account history, and back-fill any missing ops. """
     for event in Account(username).history():
         with suppress(DuplicateKeyError):
-            mongo.AccountOperations.insert_one(typify(event))
+            mongo.AccountOperations.insert_one(json_expand(typify(event)))
 
 
 def account_operations_index(mongo, username):
@@ -64,4 +71,4 @@ def update_account_ops_quick(mongo, username, batch_size=200, steemd_instance=No
         if event['index'] < start_index:
             return
         with suppress(DuplicateKeyError):
-            mongo.AccountOperations.insert_one(typify(event))
+            mongo.AccountOperations.insert_one(json_expand(typify(event)))
