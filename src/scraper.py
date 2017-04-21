@@ -44,7 +44,7 @@ def scrape_operations(mongo):
     blockchain = Blockchain(mode="irreversible")
     last_block = settings.last_block()
 
-    history = blockchain.replay(
+    history = blockchain.history(
         start_block=last_block,
     )
     print('\n> Fetching operations, starting with block %d...' % last_block)
@@ -112,7 +112,7 @@ def scrape_prices(mongo):
 
 def override(mongo):
     """Various fixes to avoid re-scraping"""
-    # # fix posts
+    # fix posts
     broken_posts = mongo.Posts.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
     for identifier in pluck('identifier', broken_posts):
         upsert_post(mongo, identifier)
