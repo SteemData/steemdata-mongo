@@ -9,9 +9,9 @@ from steemdata.helpers import timeit
 from steemdata.utils import json_expand, typify
 from toolz import merge_with
 
-from methods import update_account, update_account_ops, delete_comment, parse_operation
+from methods import update_account, update_account_ops, parse_operation, upsert_comment, delete_comment
 from mongostorage import MongoStorage, Settings, Stats
-from tasks import update_comment_async, batch_update_async
+from tasks import batch_update_async, update_comment_async
 from utils import fetch_price_feed, get_usernames_batch
 
 
@@ -43,23 +43,22 @@ def scrape_operations(mongo):
     blockchain = Blockchain(mode="irreversible")
     last_block = settings.last_block()
 
-    history = blockchain.history(
-        start_block=last_block,
-    )
-
     # handle batching
-    _dicts = []
+    _batch_size = 50
+    batch_dicts = []
+
+    history = blockchain.history(
+        start_block=last_block - _batch_size * 2,
+    )
 
     def custom_merge(*args):
         return list(set(filter(bool, flatten(args))))
 
-    def process_batch():
+    def schedule_batch(_batch_dicts):
         """Send a batch to background worker, and reset _dicts container"""
-        nonlocal _dicts
-        _batch = merge_with(custom_merge, *_dicts)
+        _batch = merge_with(custom_merge, *_batch_dicts)
         if _batch:
             batch_update_async.delay(_batch)
-        _dicts = []
 
     print('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
@@ -72,22 +71,24 @@ def scrape_operations(mongo):
                 update_comment_async.delay(post_identifier, recursive=True)
 
         # if we're close to blockchain head, enable batching
-        if last_block > blockchain.get_current_block_num() - 150:
-            _dicts.append(parse_operation(operation))
-            if operation['block_num'] % 50 == 0:
-                process_batch()
+        if last_block > blockchain.get_current_block_num() - _batch_size * 5:
+            batch_dicts.append(parse_operation(operation))
 
         # insert operation
         with suppress(DuplicateKeyError):
             mongo.Operations.insert_one(json_expand(typify(operation)))
 
-        # current block - 1 should become a new checkpoint
+        # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
             last_block = operation['block_num']
             settings.update_last_block(last_block - 1)
 
             if last_block % 10 == 0:
                 print("#%s: %s" % (last_block, time.ctime()))
+
+            if last_block % _batch_size == 0:
+                schedule_batch(batch_dicts)
+                batch_dicts = []
 
 
 def validate_operations(mongo):
@@ -108,6 +109,10 @@ def validate_operations(mongo):
         for op in block:
             with suppress(DuplicateKeyError):
                 mongo.Operations.insert_one(json_expand(typify(op)))
+
+        # re-process comments
+        for comment in (x for x in block if x['type'] == 'comment'):
+            upsert_comment(mongo, '%s/%s' % (comment['author'], comment['permlink']))
 
 
 def refresh_dbstats(mongo):

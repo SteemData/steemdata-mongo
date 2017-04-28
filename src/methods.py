@@ -152,12 +152,13 @@ def upsert_comment_chain(mongo, identifier, recursive=False):
             if recursive:
                 upsert_comment_chain(mongo, parent_identifier, recursive)
             else:
-                upsert_post(mongo, parent_identifier)
+                upsert_comment(mongo, parent_identifier)
         else:
             return mongo.Posts.update({'identifier': p.identifier}, p.export(), upsert=True)
 
 
-def upsert_post(mongo, identifier):
+def upsert_comment(mongo, identifier):
+    """ Upsert root post or comment. """
     with suppress(PostDoesNotExist):
         p = Post(identifier)
         if p.is_comment():
