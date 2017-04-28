@@ -1,3 +1,4 @@
+import logging
 import time
 from contextlib import suppress
 
@@ -13,6 +14,9 @@ from methods import update_account, update_account_ops, parse_operation, upsert_
 from mongostorage import MongoStorage, Settings, Stats
 from tasks import batch_update_async, update_comment_async
 from utils import fetch_price_feed, get_usernames_batch
+
+log = logging.getLogger(__name__)
+log.setLevel(logging.INFO)
 
 
 def scrape_all_users(mongo):
@@ -30,7 +34,7 @@ def scrape_all_users(mongo):
         update_account(mongo, username, load_extras=True)
         update_account_ops(mongo, username)
         s.set_account_checkpoint(username)
-        print('Updated @%s' % username)
+        log.info('Updated @%s' % username)
 
     # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
@@ -45,6 +49,7 @@ def scrape_operations(mongo):
 
     # handle batching
     _batch_size = 50
+    _head_block_num = last_block
     batch_dicts = []
 
     history = blockchain.history(
@@ -60,7 +65,7 @@ def scrape_operations(mongo):
         if _batch:
             batch_update_async.delay(_batch)
 
-    print('\n> Fetching operations, starting with block %d...' % last_block)
+    log.info('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
         # handle comments
         if operation['type'] in ['comment', 'delete_comment']:
@@ -71,7 +76,7 @@ def scrape_operations(mongo):
                 update_comment_async.delay(post_identifier, recursive=True)
 
         # if we're close to blockchain head, enable batching
-        if last_block > blockchain.get_current_block_num() - _batch_size * 5:
+        if last_block > _head_block_num - _batch_size * 5:
             batch_dicts.append(parse_operation(operation))
 
         # insert operation
@@ -84,11 +89,17 @@ def scrape_operations(mongo):
             settings.update_last_block(last_block - 1)
 
             if last_block % 10 == 0:
-                print("#%s: %s" % (last_block, time.ctime()))
+                _head_block_num = blockchain.get_current_block_num()
 
             if last_block % _batch_size == 0:
                 schedule_batch(batch_dicts)
                 batch_dicts = []
+
+            if last_block % 100 == 0:
+                log.info("#%s: (%s)" % (
+                    last_block,
+                    blockchain.steem.hostname
+                ))
 
 
 def validate_operations(mongo):
@@ -98,7 +109,7 @@ def validate_operations(mongo):
 
     for block_num in range(highest_block, 1, -1):
         if block_num % 10 == 0:
-            print('Validating block #%s' % block_num)
+            log.info('Validating block #%s' % block_num)
         block = list(blockchain.stream(start=block_num, stop=block_num))
 
         # remove all invalid or changed operations
@@ -132,29 +143,6 @@ def scrape_prices(mongo):
 
 def override(mongo):
     """Various fixes to avoid re-scraping"""
-    # fix posts
-    # broken_posts = mongo.Posts.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
-    # for identifier in pluck('identifier', broken_posts):
-    #     upsert_post(mongo, identifier)
-    #
-    # # fix comments
-    # broken_comments = mongo.Comments.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
-    # for identifier in pluck('identifier', broken_comments):
-    #     upsert_comment(mongo, identifier)
-    #
-    # # fix custom_json
-    # for op in mongo.Operations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
-    #     if type(op['json']) != str:
-    #         continue
-    #     with suppress(TypeError):
-    #         mongo.Operations.update(op, {'$set': {'json': json.loads(op['json'])}})
-    # for op in mongo.AccountOperations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
-    #     if type(op['json']) != str:
-    #         continue
-    #     with suppress(TypeError):
-    #         mongo.AccountOperations.update(op, {'$set': {'json': json.loads(op['json'])}})
-
-    # dont hog the loop
     time.sleep(600)
 
 
