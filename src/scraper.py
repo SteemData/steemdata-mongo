@@ -1,8 +1,6 @@
-import json
 import time
 from contextlib import suppress
 
-from funcy.colls import pluck
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
@@ -11,7 +9,7 @@ from steemdata.helpers import timeit
 from steemdata.utils import json_expand, typify
 
 from helpers import fetch_price_feed, get_usernames_batch, extract_usernames_from_op
-from methods import update_account, update_account_ops, upsert_post, upsert_comment
+from methods import update_account, update_account_ops
 from mongostorage import MongoStorage, Settings, Stats
 from tasks import update_account_async, update_post_async
 
@@ -113,26 +111,26 @@ def scrape_prices(mongo):
 def override(mongo):
     """Various fixes to avoid re-scraping"""
     # fix posts
-    broken_posts = mongo.Posts.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
-    for identifier in pluck('identifier', broken_posts):
-        upsert_post(mongo, identifier)
-
-    # fix comments
-    broken_comments = mongo.Comments.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
-    for identifier in pluck('identifier', broken_comments):
-        upsert_comment(mongo, identifier)
-
-    # fix custom_json
-    for op in mongo.Operations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
-        if type(op['json']) != str:
-            continue
-        with suppress(TypeError):
-            mongo.Operations.update(op, {'$set': {'json': json.loads(op['json'])}})
-    for op in mongo.AccountOperations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
-        if type(op['json']) != str:
-            continue
-        with suppress(TypeError):
-            mongo.AccountOperations.update(op, {'$set': {'json': json.loads(op['json'])}})
+    # broken_posts = mongo.Posts.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
+    # for identifier in pluck('identifier', broken_posts):
+    #     upsert_post(mongo, identifier)
+    #
+    # # fix comments
+    # broken_comments = mongo.Comments.find({'total_payout_value': {}}, {'identifier': 1}).limit(1000)
+    # for identifier in pluck('identifier', broken_comments):
+    #     upsert_comment(mongo, identifier)
+    #
+    # # fix custom_json
+    # for op in mongo.Operations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
+    #     if type(op['json']) != str:
+    #         continue
+    #     with suppress(TypeError):
+    #         mongo.Operations.update(op, {'$set': {'json': json.loads(op['json'])}})
+    # for op in mongo.AccountOperations.find({'type': 'custom_json', 'json': {'$type': 'string'}}):
+    #     if type(op['json']) != str:
+    #         continue
+    #     with suppress(TypeError):
+    #         mongo.AccountOperations.update(op, {'$set': {'json': json.loads(op['json'])}})
 
     # dont hog the loop
     time.sleep(600)
