@@ -1,17 +1,18 @@
 import time
 from contextlib import suppress
 
+from funcy.seqs import flatten
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
-from steem.utils import is_comment
 from steemdata.helpers import timeit
 from steemdata.utils import json_expand, typify
+from toolz import merge_with
 
-from helpers import fetch_price_feed, get_usernames_batch, extract_usernames_from_op
-from methods import update_account, update_account_ops
+from methods import update_account, update_account_ops, delete_comment, parse_operation
 from mongostorage import MongoStorage, Settings, Stats
-from tasks import update_account_async, update_post_async
+from tasks import update_comment_async, batch_update_async
+from utils import fetch_price_feed, get_usernames_batch
 
 
 def scrape_all_users(mongo):
@@ -45,20 +46,36 @@ def scrape_operations(mongo):
     history = blockchain.history(
         start_block=last_block,
     )
+
+    # handle batching
+    _dicts = []
+
+    def custom_merge(*args):
+        return list(set(filter(bool, flatten(args))))
+
+    def process_batch():
+        """Send a batch to background worker, and reset _dicts container"""
+        nonlocal _dicts
+        _batch = merge_with(custom_merge, *_dicts)
+        if _batch:
+            batch_update_async.delay(_batch)
+        _dicts = []
+
     print('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
-        # if operation is a main Post, update it in background
-        if operation['type'] == 'comment':
+        # handle comments
+        if operation['type'] in ['comment', 'delete_comment']:
             post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
-            if not operation['parent_author'] and not is_comment(operation):
-                update_post_async.delay(post_identifier, comment_type='post')
+            if operation['type'] == 'delete_comment':
+                delete_comment(mongo, post_identifier)
             else:
-                update_post_async.delay(post_identifier, comment_type='comment')
+                update_comment_async.delay(post_identifier, recursive=True)
 
-        # if we are up to date, trigger an update for referenced accounts
-        if last_block > blockchain.get_current_block_num() - 100:
-            for acc in extract_usernames_from_op(operation):
-                update_account_async.delay(acc)
+        # if we're close to blockchain head, enable batching
+        if last_block > blockchain.get_current_block_num() - 150:
+            _dicts.append(parse_operation(operation))
+            if operation['block_num'] % 50 == 0:
+                process_batch()
 
         # insert operation
         with suppress(DuplicateKeyError):
@@ -144,8 +161,8 @@ def run():
         # scrape_misc(m)
         # scrape_all_users(m, Steem())
         # validate_operations(m)
-        override(m)
-        # scrape_operations(m)
+        # override(m)
+        scrape_operations(m)
         # scrape_virtual_operations(m)
         # scrape_active_posts(m)
 
