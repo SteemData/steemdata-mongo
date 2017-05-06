@@ -65,8 +65,8 @@ class MongoStorage(object):
         self.Posts.create_index([('author', 1)])
         self.Posts.create_index([('permlink', 1)])
         self.Posts.create_index([('created', -1)])
-        self.Posts.create_index([('body', 'text')], background=True)
         self.Posts.create_index([('json_metadata.app', 1)], background=True, sparse=True)
+        self.Posts.create_index([('body', 'text'), ('title', 'text')], background=True)
 
         self.Comments.create_index([('identifier', 1)], unique=True)
         self.Comments.create_index([('parent_author', 1)])
@@ -74,7 +74,7 @@ class MongoStorage(object):
         self.Comments.create_index([('author', 1)])
         self.Comments.create_index([('permlink', 1)])
         self.Comments.create_index([('created', -1)])
-        self.Comments.create_index([('body', 'text')], background=True)
+        self.Comments.create_index([('body', 'text'), ('title', 'text')], background=True)
 
         self.PriceHistory.create_index([('timestamp', -1)])
 

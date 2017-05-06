@@ -81,7 +81,6 @@ if str(caller_name()) != '__main__':
     mongo = MongoStorage(db_name=os.getenv('DB_NAME', DB_NAME),
                          host=os.getenv('DB_HOST', MONGO_HOST),
                          port=os.getenv('DB_PORT', MONGO_PORT))
-    mongo.ensure_indexes()
 
     override_steemd()
 
