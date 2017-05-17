@@ -87,7 +87,6 @@ class Settings(object):
         if not self.settings:
             self._settings.insert_one({
                 "last_block": 1,
-                "account_index": 1,
             })
             self.settings = self._settings.find_one()
 
