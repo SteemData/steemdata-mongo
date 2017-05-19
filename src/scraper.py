@@ -8,7 +8,7 @@ from steem import Steem
 from steem.blockchain import Blockchain
 from steemdata.helpers import timeit
 from steemdata.utils import json_expand, typify
-from toolz import merge_with
+from toolz import merge_with, partition_all
 
 from methods import update_account, update_account_ops, parse_operation, upsert_comment, delete_comment
 from mongostorage import MongoStorage, Settings, Stats
@@ -19,6 +19,8 @@ log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
 
 
+# Accounts, AccountOperations
+# ---------------------------
 def scrape_all_users(mongo):
     """Scrape all existing users and insert/update their entries in Accounts collection."""
     steem = Steem()
@@ -41,6 +43,8 @@ def scrape_all_users(mongo):
         s.set_account_checkpoint(-1)
 
 
+# Operations
+# ----------
 def scrape_operations(mongo):
     """Fetch all operations from last known block forward."""
     settings = Settings(mongo)
@@ -126,6 +130,53 @@ def validate_operations(mongo):
             upsert_comment(mongo, '%s/%s' % (comment['author'], comment['permlink']))
 
 
+# Blockchain
+# ----------
+def scrape_blockchain(mongo):
+    s = Steem()
+    # see how far behind we are
+    missing = list(range(last_block_num(mongo), s.last_irreversible_block_num))
+
+    # if we are far behind blockchain head
+    # split work in chunks of 100
+    if len(missing) > 100:
+        for batch in partition_all(100, missing):
+            results = s.get_blocks(batch)
+            insert_blocks(mongo, results)
+
+    # otherwise continue as normal
+    blockchain = Blockchain(mode="irreversible")
+    hist = blockchain.stream_from(start_block=last_block_num(mongo), full_blocks=True)
+    insert_blocks(mongo, hist)
+
+
+def insert_blocks(mongo, full_blocks):
+    for block in full_blocks:
+        if not block.get('block_num'):
+            block['block_num'] = int(block['block_id'][:8], base=16)
+
+        if block['block_num'] > 1:
+            assert block_id_exists(mongo, block['previous']), 'Missing Previous Block (%s)' % block['previous']
+
+        with suppress(DuplicateKeyError):
+            mongo.db['Blockchain'].insert_one(block)
+
+
+def block_id_exists(mongo, block_id: str):
+    # covered query
+    return mongo.db['Blockchain'].find_one({'block_id': block_id}, {'_id': 0, 'block_id': 1})
+
+
+def last_block_num(mongo) -> int:
+    return mongo.db['Blockchain'].find_one(
+        filter={},
+        projection={'_id': 0, 'block_num': 1},
+        sort=[('block_num', -1)]
+    ).get('block_id', 1)
+
+
+# Misc
+# ----
 def refresh_dbstats(mongo):
     while True:
         Stats(mongo).refresh()
@@ -144,22 +195,6 @@ def scrape_prices(mongo):
 def override(mongo):
     """Various fixes to avoid re-scraping"""
     time.sleep(600)
-
-
-def scrape_blockchain(mongo):
-    blockchain = Blockchain(mode="irreversible")
-    hist = blockchain.stream_from(start_block=1, full_blocks=True)
-    for block in hist:
-        block['block_num'] = int(block['previous'][:8], base=16) + 1
-        if block['block_num'] > 1:
-            assert block_id_exists(mongo, block['previous']), 'Missing Previous Block (%s)' % block['previous']
-        with suppress(DuplicateKeyError):
-            mongo.db['Blockchain'].insert_one(block)
-
-
-def block_id_exists(mongo, block_id: str):
-    # covered query
-    return mongo.db['Blockchain'].find_one({'block_id': block_id}, {'_id': 0, 'block_id': 1})
 
 
 def run():
