@@ -49,7 +49,7 @@ def scrape_operations(mongo):
 
     # handle batching
     _batch_size = 50
-    _head_block_num = last_block
+    _head_block_num = blockchain.get_current_block_num()
     batch_dicts = []
 
     history = blockchain.history(

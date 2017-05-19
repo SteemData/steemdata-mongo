@@ -4,7 +4,7 @@ from contextlib import suppress
 
 import pymongo
 from funcy.seqs import take, first, second
-from pymongo.errors import DuplicateKeyError
+from pymongo.errors import DuplicateKeyError, WriteError
 from steem.account import Account
 from steem.post import Post
 from steem.utils import keep_in_dict
@@ -187,7 +187,11 @@ def update_account(mongo, username, load_extras=True):
     }
     if not load_extras:
         account = {'$set': account}
-    mongo.Accounts.update({'name': a.name}, account, upsert=True)
+    try:
+        mongo.Accounts.update({'name': a.name}, account, upsert=True)
+    except WriteError:
+        # todo detect invalid profile in advance
+        print("Could not update %s" % a.name)
 
 
 def update_account_ops(mongo, username):
