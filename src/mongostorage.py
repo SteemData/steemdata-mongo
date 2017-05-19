@@ -20,6 +20,7 @@ class MongoStorage(object):
             print('Can not connect to MongoDB server: %s' % e)
             raise
         else:
+            self.Blockchain = self.db['Blockchain']
             self.Accounts = self.db['Accounts']
             self.Posts = self.db['Posts']
             self.Comments = self.db['Comments']
@@ -35,6 +36,10 @@ class MongoStorage(object):
             self.db.drop_collection(col)
 
     def ensure_indexes(self):
+        self.Blockchain.create_index('previous', unique=True)
+        self.Blockchain.create_index('block_id', unique=True)
+        self.Blockchain.create_index([('block_num', -1)])
+
         self.Accounts.create_index('name', unique=True)
 
         # Operations are using _id as unique index

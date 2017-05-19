@@ -146,8 +146,25 @@ def override(mongo):
     time.sleep(600)
 
 
+def scrape_blockchain(mongo):
+    blockchain = Blockchain(mode="irreversible")
+    hist = blockchain.stream_from(start_block=1, full_blocks=True)
+    for block in hist:
+        block['block_num'] = int(block['previous'][:8], base=16) + 1
+        if block['block_num'] > 1:
+            assert block_id_exists(mongo, block['previous']), 'Missing Previous Block (%s)' % block['previous']
+        with suppress(DuplicateKeyError):
+            mongo.db['Blockchain'].insert_one(block)
+
+
+def block_id_exists(mongo, block_id: str):
+    # covered query
+    return mongo.db['Blockchain'].find_one({'block_id': block_id}, {'_id': 0, 'block_id': 1})
+
+
 def run():
     m = MongoStorage()
+    m.ensure_indexes()
     with timeit():
         # update_account(m, 'furion', load_extras=False)
         # m.ensure_indexes()
@@ -155,10 +172,12 @@ def run():
         # scrape_all_users(m, Steem())
         # validate_operations(m)
         # override(m)
-        scrape_operations(m)
+        # scrape_operations(m)
+        scrape_blockchain(m)
         # scrape_virtual_operations(m)
         # scrape_active_posts(m)
 
 
 if __name__ == '__main__':
-    run()
+    with suppress(KeyboardInterrupt):
+        run()
