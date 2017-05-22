@@ -10,7 +10,7 @@ RUN pip install -r requirements.txt
 
 # steem-python stuff
 RUN pip install --upgrade --no-deps --force-reinstall  git+git://github.com/Netherdrake/steem-python@master
-RUN steempy set nodes https://gtg.steem.house:8090,https://steemd.steemit.com,https://gtg.steem.house:8090
+RUN steempy set nodes https://gtg.steem.house:8090,https://gtg.steem.house:8090
 
 WORKDIR /project_root/src
 CMD ["python", "__main__.py"]

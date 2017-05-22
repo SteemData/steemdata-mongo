@@ -22,6 +22,7 @@ def start_worker(argv):
 
     workers = [
         'scrape_operations',
+        'scrape_blockchain',
         'validate_operations',
         'scrape_all_users',
         'scrape_prices',

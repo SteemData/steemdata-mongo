@@ -12,6 +12,7 @@ from scraper import (
     override,
     refresh_dbstats,
     validate_operations,
+    scrape_blockchain,
 )
 
 
@@ -27,6 +28,8 @@ def run_worker(worker_name):
                 scrape_operations(mongo)
             elif worker_name == "validate_operations":
                 validate_operations(mongo)
+            elif worker_name == "scrape_blockchain":
+                scrape_blockchain(mongo)
             elif worker_name == "scrape_all_users":
                 scrape_all_users(mongo)
             elif worker_name == "scrape_prices":
