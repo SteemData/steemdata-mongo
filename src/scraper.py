@@ -80,7 +80,8 @@ def scrape_operations(mongo):
                 update_comment_async.delay(post_identifier, recursive=True)
 
         # if we're close to blockchain head, enable batching
-        if last_block > _head_block_num - _batch_size * 5:
+        recent_blocks = 20 * 60 * 24 * 10  # 7 days worth of blocks
+        if last_block > _head_block_num - recent_blocks:
             batch_dicts.append(parse_operation(operation))
 
         # insert operation

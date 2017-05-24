@@ -227,19 +227,6 @@ def update_account_ops_quick(mongo, username, batch_size=200, steemd_instance=No
 
 
 # def _get_ops(block_nums):
-#     """ Fetch multiple blocks from steemd at once.
-#
-#     Warning:
-#         This method does not ensure that all blocks are returned, or that the results are ordered.
-#         You will probably want to use `steemd.get_blocks()` instead.
-#
-#     Args:
-#         blocks (list): A list, or a set of block numbers.
-#
-#     Returns:
-#         A generator with results.
-#
-#     """
 #     s = Steem().steemd
 #     params = zip(block_nums, repeat(False))
 #     results = s.exec_multi_with_futures('get_ops_in_block', params, False, max_workers=10)
@@ -247,35 +234,17 @@ def update_account_ops_quick(mongo, username, batch_size=200, steemd_instance=No
 #
 #
 # def get_ops(block_nums: List[int]):
-#     """ Fetch multiple blocks from steemd at once, given a range.
-#
-#     Args:
-#         block_nums (list): A list of all block numbers we would like to tech.
-#
-#     Returns:
-#         dict: An ensured and ordered list of all `get_block` results.
-#     """
 #     operations = {}
 #     results = []
 #
 #     while not results:
 #         results = _get_ops(block_nums)
-#
+#     # todo: sort by block num
 #     results = [x for x in results if x]
 #     return results
 #
 #
 # def get_ops_range(start: int, end: int):
-#     """ Fetch multiple blocks from steemd at once, given a range.
-#
-#     Args:
-#         start (int): The number of the block to start with
-#         end (int): The number of the block at the end of the range. Not included in results.
-#
-#     Returns:
-#         dict: An ensured and ordered list of all `get_block` results.
-#
-#     """
 #     return get_ops(list(range(start, end)))
 #
 #
