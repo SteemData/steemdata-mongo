@@ -66,13 +66,19 @@ class MongoStorage(object):
         self.AccountOperations.create_index([('timestamp', -1)])
         self.AccountOperations.create_index([('index', -1)])
 
+        self.Posts.create_index([('author', 1), ('permlink', 1)], unique=True)
         self.Posts.create_index([('identifier', 1)], unique=True)
         self.Posts.create_index([('author', 1)])
-        self.Posts.create_index([('permlink', 1)])
+        # self.Posts.create_index([('permlink', 1)])
         self.Posts.create_index([('created', -1)])
         self.Posts.create_index([('json_metadata.app', 1)], background=True, sparse=True)
+        # self.Posts.create_index([('json_metadata.links', 1)], background=True, sparse=True) # failIndexKeyTooLong
+        self.Posts.create_index([('json_metadata.users', 1)], background=True, sparse=True)
+        self.Posts.create_index([('json_metadata.tags', 1)], background=True, sparse=True)
+        self.Posts.create_index([('json_metadata.community', 1)], background=True, sparse=True)
         self.Posts.create_index([('body', 'text'), ('title', 'text')], background=True)
 
+        # self.Comments.create_index([('author', 1), ('permlink', 1)], unique=True)
         self.Comments.create_index([('identifier', 1)], unique=True)
         self.Comments.create_index([('parent_author', 1)])
         self.Comments.create_index([('parent_permlink', 1)])
