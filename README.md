@@ -21,33 +21,14 @@ Password: steemit
 ![](https://i.gyazo.com/7717985009640f28083efa5aaca7a72d.png)
 
 
-### Collections
+## Deployment
 
-#### Accounts 
-Accounts contains Steem Accounts and their:
-- account info / profile
-- balances
-- vesting routes
-- open conversion requests
-- voting history on posts
-- a list of followers and followings
-- witness votes
-- curation stats
+### SBDS
+Create read-only steemit user when mysql first starts.
+```
+scp sbds.sql root@88.99.244.116:/sbds-mysql-init/
+```
 
-#### Posts
-All top-level posts, with full-text search support. Comments coming in 1.3.
-
-#### Operations
-Operations contains all the events that happened on the blockchain so far.
-
-#### Account Operations
-Same as operations, but with account ownership attached for easy querying.
-
-#### PriceHistory
-Hourly snapshots of Bitcoin, STEEM, SBD and USD implied prices.
-
-### Contribute
-Needless to say, PR's are welcome :)
-
-### License
-This project is [MIT](https://github.com/SteemData/steemdata-mongo) Licensed.
+### MongoDB
+Create a read-only steemit user from createUser.mongo
+from mongodb shell when mongo first starts.

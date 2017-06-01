@@ -82,7 +82,7 @@ if str(caller_name()) != '__main__':
                          host=os.getenv('DB_HOST', MONGO_HOST),
                          port=os.getenv('DB_PORT', MONGO_PORT))
 
-    override_steemd()
+    # override_steemd()
 
 # task definitions
 # ----------------
@@ -103,7 +103,7 @@ def update_comment_async(post_identifier, recursive=False):
 @tasks.task
 def batch_update_async(batch_items: dict):
     # try to always be on the EU node
-    ensure_eu_node()
+    # ensure_eu_node()
     for identifier in batch_items['comments']:
         with log_exceptions():
             upsert_comment_chain(mongo, identifier, recursive=True)
@@ -115,4 +115,3 @@ def batch_update_async(batch_items: dict):
         with log_exceptions():
             update_account(mongo, account_name, load_extras=False)
             update_account_ops_quick(mongo, account_name)
-
