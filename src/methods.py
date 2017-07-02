@@ -122,12 +122,13 @@ def parse_operation(op):
 
     # handle followers
     if op_type == 'custom_json':
-        cmd, op_json = json.loads(op['json'])  # ['follow', {data...}]
-        if cmd == 'follow':
-            accs = keep_in_dict(op_json, ['follower', 'following']).values()
-            update_accounts_light.discard(first(accs))
-            update_accounts_light.discard(second(accs))
-            update_accounts_full.update(accs)
+        with suppress(ValueError):
+            cmd, op_json = json.loads(op['json'])  # ['follow', {data...}]
+            if cmd == 'follow':
+                accs = keep_in_dict(op_json, ['follower', 'following']).values()
+                update_accounts_light.discard(first(accs))
+                update_accounts_light.discard(second(accs))
+                update_accounts_full.update(accs)
 
     return {
         'accounts': list(update_accounts_full),
