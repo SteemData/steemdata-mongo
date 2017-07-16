@@ -56,3 +56,8 @@ def log_exceptions():
         yield
     except:
         print(traceback.format_exc())
+
+
+def time_delta(item_time):
+    delta = datetime.utcnow().replace(tzinfo=None) - item_time.replace(tzinfo=None)
+    return delta.seconds

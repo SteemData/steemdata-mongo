@@ -227,6 +227,14 @@ def update_account_ops_quick(mongo, username, batch_size=200, steemd_instance=No
             mongo.AccountOperations.insert_one(json_expand(typify(event)))
 
 
+def find_latest_item(mongo, collection_name, field_name):
+    last_op = mongo.db[collection_name].find_one(
+        filter={},
+        projection={field_name: 1, '_id': 0},
+        sort=[(field_name, pymongo.DESCENDING)],
+    )
+    return last_op[field_name]
+
 # def _get_ops(block_nums):
 #     s = Steem().steemd
 #     params = zip(block_nums, repeat(False))

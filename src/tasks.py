@@ -3,9 +3,9 @@ import os
 
 from celery import Celery
 
-from methods import update_account, update_account_ops_quick, upsert_comment_chain
+from methods import update_account, update_account_ops_quick, upsert_comment_chain, find_latest_item
 from mongostorage import MongoStorage, DB_NAME, MONGO_HOST, MONGO_PORT
-from utils import log_exceptions
+from utils import log_exceptions, time_delta
 
 # override a node for perf reasons
 _custom_node = False
@@ -103,9 +103,19 @@ def update_comment_async(post_identifier, recursive=False):
 @tasks.task
 def batch_update_async(batch_items: dict):
     # todo break this batch into posts and account updates
+    lag = time_delta(find_latest_item(mongo, 'Posts', 'created'))
+
+    if lag > 5000:
+        return
+
     for identifier in batch_items['comments']:
         with log_exceptions():
-            upsert_comment_chain(mongo, identifier, recursive=True)
+            upsert_comment_chain(mongo, identifier, recursive=False)  # should be True
+
+    # if we're lagging by a large margin, don't bother updating accounts
+    if lag > 10000:
+        return
+
     for account_name in batch_items['accounts_light']:
         with log_exceptions():
             update_account(mongo, account_name, load_extras=False)
