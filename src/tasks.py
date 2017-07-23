@@ -105,7 +105,7 @@ def batch_update_async(batch_items: dict):
     # todo break this batch into posts and account updates
     lag = time_delta(find_latest_item(mongo, 'Posts', 'created'))
 
-    if lag > 5000:
+    if lag > 1000:
         return
 
     for identifier in batch_items['comments']:
@@ -113,7 +113,7 @@ def batch_update_async(batch_items: dict):
             upsert_comment_chain(mongo, identifier, recursive=False)  # should be True
 
     # if we're lagging by a large margin, don't bother updating accounts
-    if lag > 10000:
+    if lag > 500:
         return
 
     for account_name in batch_items['accounts_light']:
