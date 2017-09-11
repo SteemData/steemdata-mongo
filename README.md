@@ -22,13 +22,5 @@ Password: steemit
 
 
 ## Deployment
-
-### SBDS
-Create read-only steemit user when mysql first starts.
-```
-scp sbds.sql root@88.99.244.116:/sbds-mysql-init/
-```
-
-### MongoDB
 Create a read-only steemit user from createUser.mongo
 from mongodb shell when mongo first starts.

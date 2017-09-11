@@ -12,7 +12,7 @@ from toolz import merge_with, partition_all
 
 from methods import update_account, update_account_ops, parse_operation, upsert_comment, delete_comment
 from mongostorage import MongoStorage, Settings, Stats
-from tasks import batch_update_async, update_comment_async
+from tasks import batch_update_async
 from utils import fetch_price_feed, get_usernames_batch
 
 log = logging.getLogger(__name__)
@@ -77,7 +77,8 @@ def scrape_operations(mongo):
             if operation['type'] == 'delete_comment':
                 delete_comment(mongo, post_identifier)
             else:
-                update_comment_async.delay(post_identifier, recursive=True)
+                upsert_comment(mongo, '%s/%s' % (operation['author'], operation['permlink']))
+                # update_comment_async.delay(post_identifier, recursive=True)
 
         # if we're close to blockchain head, enable batching
         recent_blocks = 20 * 60 * 24 * 10  # 7 days worth of blocks
@@ -208,8 +209,8 @@ def run():
         # scrape_all_users(m, Steem())
         # validate_operations(m)
         # override(m)
-        # scrape_operations(m)
-        scrape_blockchain(m)
+        scrape_operations(m)
+        # scrape_blockchain(m)
         # scrape_virtual_operations(m)
         # scrape_active_posts(m)
 
