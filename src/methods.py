@@ -191,8 +191,10 @@ def update_account(mongo, username, load_extras=True):
     try:
         mongo.Accounts.update({'name': a.name}, account, upsert=True)
     except WriteError:
-        # todo detect invalid profile in advance
-        print("Could not update %s" % a.name)
+        # likely an invalid profile
+        account['json_metadata'] = {}
+        mongo.Accounts.update({'name': a.name}, account, upsert=True)
+        print("Invalidated json_metadata on %s" % a.name)
 
 
 def update_account_ops(mongo, username):

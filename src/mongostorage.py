@@ -103,11 +103,17 @@ class Settings(object):
     def update_last_block(self, block_num):
         return self._settings.update_one({}, {"$set": {'last_block': block_num}})
 
-    def account_checkpoint(self):
-        return self.settings.get('account_checkpoint', 1)
+    def account_checkpoint(self, quick):
+        field = 'account_checkpoint'
+        if quick:
+            field = 'account_checkpoint_quick'
+        return self.settings.get(field, 1)
 
-    def set_account_checkpoint(self, index_num):
-        return self._settings.update_one({}, {"$set": {'account_checkpoint': index_num}})
+    def set_account_checkpoint(self, index_num, quick):
+        field = 'account_checkpoint'
+        if quick:
+            field = 'account_checkpoint_quick'
+        return self._settings.update_one({}, {"$set": {field: index_num}})
 
 
 class Stats(object):

@@ -10,7 +10,13 @@ from steemdata.helpers import timeit
 from steemdata.utils import json_expand, typify
 from toolz import merge_with, partition_all
 
-from methods import update_account, update_account_ops, parse_operation, upsert_comment, delete_comment
+from methods import (
+    update_account,
+    update_account_ops,
+    parse_operation,
+    upsert_comment,
+    delete_comment,
+)
 from mongostorage import MongoStorage, Settings, Stats
 from tasks import batch_update_async
 from utils import fetch_price_feed, get_usernames_batch
@@ -21,26 +27,27 @@ log.setLevel(logging.INFO)
 
 # Accounts, AccountOperations
 # ---------------------------
-def scrape_all_users(mongo):
+def scrape_all_users(mongo, quick=False):
     """Scrape all existing users and insert/update their entries in Accounts collection."""
     steem = Steem()
     s = Settings(mongo)
 
-    account_checkpoint = s.account_checkpoint()
+    account_checkpoint = s.account_checkpoint(quick)
     if account_checkpoint:
         usernames = list(get_usernames_batch(account_checkpoint, steem))
     else:
         usernames = list(get_usernames_batch(steem))
 
     for username in usernames:
-        update_account(mongo, username, load_extras=True)
-        update_account_ops(mongo, username)
-        s.set_account_checkpoint(username)
+        update_account(mongo, username, load_extras=quick)
+        if not quick:
+            update_account_ops(mongo, username)
+        s.set_account_checkpoint(username, quick)
         log.info('Updated @%s' % username)
 
     # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
-        s.set_account_checkpoint(-1)
+        s.set_account_checkpoint(-1, quick)
 
 
 # Operations
@@ -77,11 +84,12 @@ def scrape_operations(mongo):
             if operation['type'] == 'delete_comment':
                 delete_comment(mongo, post_identifier)
             else:
+                # with suppress(TypeError):
                 upsert_comment(mongo, '%s/%s' % (operation['author'], operation['permlink']))
                 # update_comment_async.delay(post_identifier, recursive=True)
 
         # if we're close to blockchain head, enable batching
-        recent_blocks = 20 * 60 * 24 * 10  # 7 days worth of blocks
+        recent_blocks = 20 * 60 * 24 * 1  # 1 days worth of blocks
         if last_block > _head_block_num - recent_blocks:
             batch_dicts.append(parse_operation(operation))
 
@@ -91,6 +99,7 @@ def scrape_operations(mongo):
 
         # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
+            # print("last block", last_block)
             last_block = operation['block_num']
             settings.update_last_block(last_block - 1)
 
@@ -109,11 +118,12 @@ def scrape_operations(mongo):
 
 
 def validate_operations(mongo):
-    """ Scan each block in db and validate its operations for consistency reasons. """
+    """ Scan latest N blocks in db and validate its operations for consistency reasons. """
     blockchain = Blockchain(mode="irreversible")
     highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
+    lowest_block = max([highest_block - 100_000, 1])
 
-    for block_num in range(highest_block, 1, -1):
+    for block_num in range(highest_block, lowest_block, -1):
         if block_num % 10 == 0:
             log.info('Validating block #%s' % block_num)
         block = list(blockchain.stream(start=block_num, stop=block_num))

@@ -25,6 +25,7 @@ def start_worker(argv):
         'scrape_blockchain',
         'validate_operations',
         'scrape_all_users',
+        'scrape_all_users_quick',
         'scrape_prices',
         'refresh_dbstats',
         'override',

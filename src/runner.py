@@ -31,7 +31,9 @@ def run_worker(worker_name):
             elif worker_name == "scrape_blockchain":
                 scrape_blockchain(mongo)
             elif worker_name == "scrape_all_users":
-                scrape_all_users(mongo)
+                scrape_all_users(mongo, quick=False)
+            elif worker_name == "scrape_all_users_quick":
+                scrape_all_users(mongo, quick=True)
             elif worker_name == "scrape_prices":
                 scrape_prices(mongo)
             elif worker_name == "refresh_dbstats":

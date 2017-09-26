@@ -110,7 +110,7 @@ def batch_update_async(batch_items: dict):
 
     for identifier in batch_items['comments']:
         with log_exceptions():
-            upsert_comment_chain(mongo, identifier, recursive=False)  # should be True
+            upsert_comment_chain(mongo, identifier, recursive=True)
 
     # if we're lagging by a large margin, don't bother updating accounts
     if lag > 500:
@@ -122,5 +122,5 @@ def batch_update_async(batch_items: dict):
             update_account_ops_quick(mongo, account_name)
     for account_name in batch_items['accounts']:
         with log_exceptions():
-            update_account(mongo, account_name, load_extras=False)  # should be True
+            update_account(mongo, account_name, load_extras=True)  # should be True
             update_account_ops_quick(mongo, account_name)
