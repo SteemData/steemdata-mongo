@@ -121,12 +121,12 @@ def validate_operations(mongo):
     """ Scan latest N blocks in db and validate its operations for consistency reasons. """
     blockchain = Blockchain(mode="irreversible")
     highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
-    lowest_block = max([highest_block - 100_000, 1])
+    lowest_block = max(1, highest_block - 250_000)
 
     for block_num in range(highest_block, lowest_block, -1):
-        if block_num % 10 == 0:
+        if block_num % 100 == 0:
             log.info('Validating block #%s' % block_num)
-        block = list(blockchain.stream(start=block_num, stop=block_num))
+        block = list(blockchain.stream(start_block=block_num, end_block=block_num))
 
         # remove all invalid or changed operations
         conditions = {'block_num': block_num, '_id': {'$nin': [x['_id'] for x in block]}}
@@ -137,7 +137,7 @@ def validate_operations(mongo):
             with suppress(DuplicateKeyError):
                 mongo.Operations.insert_one(json_expand(typify(op)))
 
-        # re-process comments
+        # re-process comments (does not re-add deleted posts)
         for comment in (x for x in block if x['type'] == 'comment'):
             upsert_comment(mongo, '%s/%s' % (comment['author'], comment['permlink']))
 
@@ -217,9 +217,9 @@ def run():
         # m.ensure_indexes()
         # scrape_misc(m)
         # scrape_all_users(m, Steem())
-        # validate_operations(m)
+        validate_operations(m)
         # override(m)
-        scrape_operations(m)
+        # scrape_operations(m)
         # scrape_blockchain(m)
         # scrape_virtual_operations(m)
         # scrape_active_posts(m)
