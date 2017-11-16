@@ -3,13 +3,13 @@ import json
 from contextlib import suppress
 
 import pymongo
-from funcy.seqs import take, first, second
+from funcy import compose, take, first, second
 from pymongo.errors import DuplicateKeyError, WriteError
 from steem.account import Account
 from steem.post import Post
 from steem.utils import keep_in_dict
 from steembase.exceptions import PostDoesNotExist
-from steemdata.utils import typify, json_expand
+from steemdata.utils import typify, json_expand, remove_body
 
 
 def parse_operation(op):
@@ -201,7 +201,8 @@ def update_account_ops(mongo, username):
     """ This method will fetch entire account history, and back-fill any missing ops. """
     for event in Account(username).history():
         with suppress(DuplicateKeyError):
-            mongo.AccountOperations.insert_one(json_expand(typify(event)))
+            transform = compose(remove_body, json_expand, typify)
+            mongo.AccountOperations.insert_one(transform(event))
 
 
 def account_operations_index(mongo, username):
