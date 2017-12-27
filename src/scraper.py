@@ -7,7 +7,10 @@ from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
 from steemdata.helpers import timeit
-from steemdata.utils import json_expand, typify
+from steemdata.utils import (
+    json_expand,
+    typify,
+)
 from toolz import merge_with, partition_all
 
 from methods import (
@@ -19,7 +22,10 @@ from methods import (
 )
 from mongostorage import MongoStorage, Settings, Stats
 from tasks import batch_update_async
-from utils import fetch_price_feed, get_usernames_batch
+from utils import (
+    fetch_price_feed,
+    get_usernames_batch,
+)
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
@@ -28,9 +34,13 @@ log.setLevel(logging.INFO)
 # Accounts, AccountOperations
 # ---------------------------
 def scrape_all_users(mongo, quick=False):
-    """Scrape all existing users and insert/update their entries in Accounts collection."""
+    """
+    Scrape all existing users
+    and insert/update their entries in Accounts collection.
+    """
     steem = Steem()
     s = Settings(mongo)
+    quick = False  # TODO: remove temporary override
 
     account_checkpoint = s.account_checkpoint(quick)
     if account_checkpoint:
@@ -59,12 +69,12 @@ def scrape_operations(mongo):
     last_block = settings.last_block()
 
     # handle batching
-    _batch_size = 50
+    _batch_size = 100
     _head_block_num = blockchain.get_current_block_num()
     batch_dicts = []
 
     history = blockchain.history(
-        start_block=last_block - _batch_size * 2,
+        start_block=last_block,
     )
 
     def custom_merge(*args):
@@ -84,9 +94,11 @@ def scrape_operations(mongo):
             if operation['type'] == 'delete_comment':
                 delete_comment(mongo, post_identifier)
             else:
-                # with suppress(TypeError):
-                upsert_comment(mongo, '%s/%s' % (operation['author'], operation['permlink']))
-                # update_comment_async.delay(post_identifier, recursive=True)
+                with suppress(TypeError):
+                    upsert_comment(
+                        mongo,
+                        '%s/%s' % (operation['author'], operation['permlink'])
+                    )
 
         # if we're close to blockchain head, enable batching
         recent_blocks = 20 * 60 * 24 * 1  # 1 days worth of blocks
@@ -99,7 +111,7 @@ def scrape_operations(mongo):
 
         # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
-            # print("last block", last_block)
+            print("last block:", last_block)
             last_block = operation['block_num']
             settings.update_last_block(last_block - 1)
 
@@ -168,7 +180,8 @@ def insert_blocks(mongo, full_blocks):
             block['block_num'] = int(block['block_id'][:8], base=16)
 
         if block['block_num'] > 1:
-            assert block_id_exists(mongo, block['previous']), 'Missing Previous Block (%s)' % block['previous']
+            assert block_id_exists(mongo, block['previous']), \
+                'Missing Previous Block (%s)' % block['previous']
 
         with suppress(DuplicateKeyError):
             mongo.db['Blockchain'].insert_one(block)
@@ -176,7 +189,8 @@ def insert_blocks(mongo, full_blocks):
 
 def block_id_exists(mongo, block_id: str):
     # covered query
-    return mongo.db['Blockchain'].find_one({'block_id': block_id}, {'_id': 0, 'block_id': 1})
+    return mongo.db['Blockchain'].find_one(
+        {'block_id': block_id}, {'_id': 0, 'block_id': 1})
 
 
 def last_block_num(mongo) -> int:

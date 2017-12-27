@@ -3,7 +3,8 @@ import os
 
 from celery import Celery
 
-from methods import update_account, update_account_ops_quick, upsert_comment_chain, find_latest_item
+from methods import update_account, update_account_ops_quick, upsert_comment_chain, \
+    find_latest_item
 from mongostorage import MongoStorage, DB_NAME, MONGO_HOST, MONGO_PORT
 from utils import log_exceptions, time_delta
 
@@ -119,8 +120,8 @@ def batch_update_async(batch_items: dict):
     for account_name in batch_items['accounts_light']:
         with log_exceptions():
             update_account(mongo, account_name, load_extras=False)
-            update_account_ops_quick(mongo, account_name)
+            # update_account_ops_quick(mongo, account_name) # TODO: re-enable this
     for account_name in batch_items['accounts']:
         with log_exceptions():
-            update_account(mongo, account_name, load_extras=True)  # should be True
-            update_account_ops_quick(mongo, account_name)
+            update_account(mongo, account_name, load_extras=True)
+            # update_account_ops_quick(mongo, account_name) # TODO: re-enable this
