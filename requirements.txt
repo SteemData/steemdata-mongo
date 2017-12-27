@@ -2,5 +2,4 @@ celery[redis]
 pymongo
 tqdm
 funcy
-steemdata>=2.3
 

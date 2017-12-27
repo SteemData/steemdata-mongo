@@ -7,8 +7,9 @@ WORKDIR /app
 ENV UNLOCK foo
 
 RUN pip install -r requirements.txt
-RUN pip install --upgrade --force-reinstall git+git://github.com/Netherdrake/steem-python@master
-# do not use
+RUN pip install git+git://github.com/Netherdrake/steem-python@master
+RUN pip install git+git://github.com/SteemData/steemdata@master
+
 RUN steempy set nodes http://136.243.77.24:8090
 #RUN steempy set round_robin true
 
