@@ -6,7 +6,6 @@ from funcy.seqs import flatten
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
-from steemdata.helpers import timeit
 from steemdata.utils import (
     json_expand,
     typify,
@@ -20,7 +19,7 @@ from methods import (
     upsert_comment,
     delete_comment,
 )
-from mongostorage import MongoStorage, Settings, Stats
+from mongostorage import Settings, Stats
 from tasks import batch_update_async
 from utils import (
     fetch_price_feed,
@@ -224,20 +223,16 @@ def override(mongo):
 
 
 def run():
+    from mongostorage import MongoStorage
+    from steemdata.helpers import timeit
     m = MongoStorage()
     m.ensure_indexes()
     with timeit():
-        update_account_ops(m, 'furion')
+        scrape_operations(m)
         # update_account(m, 'furion', load_extras=True)
-        # m.ensure_indexes()
-        # scrape_misc(m)
-        # scrape_all_users(m, Steem())
+        # update_account_ops(m, 'furion')
+        # scrape_all_users(m, False)
         # validate_operations(m)
-        # override(m)
-        # scrape_operations(m)
-        # scrape_blockchain(m)
-        # scrape_virtual_operations(m)
-        # scrape_active_posts(m)
 
 
 if __name__ == '__main__':
