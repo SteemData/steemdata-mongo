@@ -2,7 +2,7 @@ import logging
 import time
 from contextlib import suppress
 
-from funcy.seqs import flatten
+from funcy import compose, flatten
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
@@ -24,6 +24,7 @@ from tasks import batch_update_async
 from utils import (
     fetch_price_feed,
     get_usernames_batch,
+    strip_dot_from_keys,
 )
 
 log = logging.getLogger(__name__)
@@ -106,7 +107,8 @@ def scrape_operations(mongo):
 
         # insert operation
         with suppress(DuplicateKeyError):
-            mongo.Operations.insert_one(json_expand(typify(operation)))
+            transform = compose(strip_dot_from_keys, json_expand, typify)
+            mongo.Operations.insert_one(transform(operation))
 
         # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
@@ -146,7 +148,8 @@ def validate_operations(mongo):
         # insert any missing operations
         for op in block:
             with suppress(DuplicateKeyError):
-                mongo.Operations.insert_one(json_expand(typify(op)))
+                transform = compose(strip_dot_from_keys, json_expand, typify)
+                mongo.Operations.insert_one(transform(op))
 
         # re-process comments (does not re-add deleted posts)
         for comment in (x for x in block if x['type'] == 'comment'):

@@ -61,3 +61,18 @@ def log_exceptions():
 def time_delta(item_time):
     delta = datetime.utcnow().replace(tzinfo=None) - item_time.replace(tzinfo=None)
     return delta.seconds
+
+
+def strip_dot_from_keys(data: dict, replace_char='#') -> dict:
+    """ Return a dictionary safe for MongoDB entry.
+
+    ie. `{'foo.bar': 'baz'}` becomes `{'foo#bar': 'baz'}`
+    """
+    new_ = dict()
+    for k, v in data.items():
+        if type(v) == dict:
+            v = strip_dot_from_keys(v)
+        if '.' in k:
+            k = k.replace('.', replace_char)
+        new_[k] = v
+    return new_

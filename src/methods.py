@@ -11,6 +11,8 @@ from steem.utils import keep_in_dict
 from steembase.exceptions import PostDoesNotExist
 from steemdata.utils import typify, json_expand, remove_body
 
+from utils import strip_dot_from_keys
+
 
 def parse_operation(op):
     """ Update all relevant collections that this op impacts. """
@@ -147,28 +149,27 @@ def upsert_comment_chain(mongo, identifier, recursive=False):
     """
     with suppress(PostDoesNotExist):
         p = Post(identifier)
-        if p.is_comment():
-            mongo.Comments.update({'identifier': p.identifier}, p.export(), upsert=True)
+        upsert_comment(mongo, p.identifier)
+        if recursive and p.is_comment():
             parent_identifier = '@%s/%s' % (p.parent_author, p.parent_permlink)
-            if recursive:
-                upsert_comment_chain(mongo, parent_identifier, recursive)
-            else:
-                upsert_comment(mongo, parent_identifier)
-        else:
-            return mongo.Posts.update({'identifier': p.identifier}, p.export(), upsert=True)
+            upsert_comment_chain(mongo, parent_identifier, recursive)
 
 
 def upsert_comment(mongo, identifier):
     """ Upsert root post or comment. """
     with suppress(PostDoesNotExist):
         p = Post(identifier)
+        update = {'$set': strip_dot_from_keys(p.export())}
         if p.is_comment():
-            return mongo.Comments.update({'identifier': p.identifier}, p.export(), upsert=True)
-        return mongo.Posts.update({'identifier': p.identifier}, p.export(), upsert=True)
+            return mongo.Comments.update(
+                {'identifier': p.identifier},
+                update, upsert=True)
+        return mongo.Posts.update({'identifier': p.identifier}, update, upsert=True)
 
 
 def delete_comment(mongo, identifier):
-    return mongo.Comments.update({'identifier': identifier}, {'$set': {'is_deleted': True}}, upsert=True)
+    return mongo.Comments.update({'identifier': identifier},
+                                 {'$set': {'is_deleted': True}}, upsert=True)
 
 
 def update_account(mongo, username, load_extras=True):
@@ -186,6 +187,9 @@ def update_account(mongo, username, load_extras=True):
         'account': username,
         'updatedAt': dt.datetime.utcnow(),
     }
+    if type(account['json_metadata']) is dict:
+        account['json_metadata'] = \
+            strip_dot_from_keys(account['json_metadata'])
     if not load_extras:
         account = {'$set': account}
     try:
@@ -201,7 +205,7 @@ def update_account_ops(mongo, username):
     """ This method will fetch entire account history, and back-fill any missing ops. """
     for event in Account(username).history():
         with suppress(DuplicateKeyError):
-            transform = compose(remove_body, json_expand, typify)
+            transform = compose(strip_dot_from_keys, remove_body, json_expand, typify)
             mongo.AccountOperations.insert_one(transform(event))
 
 
