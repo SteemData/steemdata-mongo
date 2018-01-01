@@ -1,7 +1,7 @@
 import traceback
 from datetime import datetime
 
-from funcy.decorators import contextmanager
+from funcy import contextmanager
 from steem import Steem
 from steemdata.helpers import simple_cache, create_cache
 from steemdata.markets import Markets

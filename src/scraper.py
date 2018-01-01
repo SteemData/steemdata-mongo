@@ -131,7 +131,7 @@ def scrape_operations(mongo):
 
 
 def validate_operations(mongo):
-    """ Scan latest N blocks in db and validate its operations for consistency reasons. """
+    """ Scan latest N blocks in the database and validate its operations. """
     blockchain = Blockchain(mode="irreversible")
     highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
     lowest_block = max(1, highest_block - 250_000)

@@ -6,7 +6,12 @@ import traceback
 from contextlib import suppress
 from multiprocessing.pool import Pool
 
-from mongostorage import MongoStorage, MONGO_HOST, DB_NAME, MONGO_PORT
+from mongostorage import (
+    MongoStorage,
+    DB_NAME,
+    MONGO_HOST,
+    MONGO_PORT,
+)
 from scraper import (
     scrape_all_users,
     scrape_operations,
