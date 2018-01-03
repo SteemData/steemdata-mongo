@@ -1,4 +1,4 @@
-import traceback
+import os
 from datetime import datetime
 
 from funcy import contextmanager
@@ -7,6 +7,33 @@ from steemdata.helpers import simple_cache, create_cache
 from steemdata.markets import Markets
 
 usernames_cache = create_cache()
+
+logger = None
+
+
+def log_exception():
+    """ Log to sentry.io. Alternatively,
+    fallback to stdout stacktrace dump."""
+    global logger
+
+    dsn = os.getenv('SENTRY_DSN')
+    if dsn:
+        import raven
+        logger = raven.Client(dsn)
+
+    if logger:
+        logger.captureException()
+    else:
+        import traceback
+        print(traceback.format_exc())
+
+
+@contextmanager
+def log_exceptions():
+    try:
+        yield
+    except:
+        log_exception()
 
 
 @simple_cache(usernames_cache, timeout=30 * 60)
@@ -48,14 +75,6 @@ def fetch_price_feed():
         "steem_usd_implied": round(m.steem_usd_implied(), 6),
         "sbd_usd_implied": round(m.sbd_usd_implied(), 6),
     }
-
-
-@contextmanager
-def log_exceptions():
-    try:
-        yield
-    except:
-        print(traceback.format_exc())
 
 
 def time_delta(item_time):

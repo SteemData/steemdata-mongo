@@ -2,4 +2,4 @@ celery[redis]
 pymongo
 tqdm
 funcy
-
+raven

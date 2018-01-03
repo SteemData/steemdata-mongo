@@ -2,7 +2,6 @@ import multiprocessing
 import os
 import sys
 import time
-import traceback
 from contextlib import suppress
 from multiprocessing.pool import Pool
 
@@ -21,6 +20,7 @@ from scraper import (
     validate_operations,
     scrape_blockchain,
 )
+from utils import log_exception
 
 
 def run(worker_name):
@@ -52,9 +52,9 @@ def run(worker_name):
         except (KeyboardInterrupt, SystemExit):
             print('Quitting...')
             exit(0)
-        except:
+        except Exception as e:
             print('Exception in worker:', worker_name)
-            print(traceback.format_exc())
+            log_exception()
 
         # prevent IO overflow
         time.sleep(5)
