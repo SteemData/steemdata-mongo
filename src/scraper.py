@@ -39,7 +39,6 @@ def scrape_all_users(mongo, quick=False):
     """
     steem = Steem()
     s = Settings(mongo)
-    quick = False  # TODO: remove temporary override
 
     account_checkpoint = s.account_checkpoint(quick)
     if account_checkpoint:
