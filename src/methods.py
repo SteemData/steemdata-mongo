@@ -42,11 +42,6 @@ def upsert_comment(mongo, identifier):
         return mongo.Posts.update({'identifier': p.identifier}, update, upsert=True)
 
 
-def delete_comment(mongo, identifier):
-    return mongo.Comments.update({'identifier': identifier},
-                                 {'$set': {'is_deleted': True}}, upsert=True)
-
-
 def update_account(mongo, username, load_extras=True):
     """ Update Account. 
     

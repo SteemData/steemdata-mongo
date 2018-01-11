@@ -17,7 +17,6 @@ from methods import (
     update_account_ops,
     parse_operation,
     upsert_comment,
-    delete_comment,
 )
 from mongostorage import Settings, Stats
 from tasks import batch_update_async
@@ -94,16 +93,10 @@ def scrape_operations(mongo):
     log.info('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
         # handle comments
-        if operation['type'] in ['comment', 'delete_comment']:
+        if operation['type'] == 'comment':
             post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
-            if operation['type'] == 'delete_comment':
-                delete_comment(mongo, post_identifier)
-            else:
-                with suppress(TypeError):
-                    upsert_comment(
-                        mongo,
-                        '%s/%s' % (operation['author'], operation['permlink'])
-                    )
+            with suppress(TypeError):
+                upsert_comment(mongo, post_identifier)
 
         # if we're close to blockchain head, enable batching
         recent_blocks = 20 * 60 * 24 * 1  # 1 days worth of blocks
