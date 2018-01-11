@@ -1,5 +1,7 @@
 import os
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
+from typing import List, Any
 
 from funcy import contextmanager
 from steem import Steem
@@ -95,3 +97,48 @@ def strip_dot_from_keys(data: dict, replace_char='#') -> dict:
             k = k.replace('.', replace_char)
         new_[k] = v
     return new_
+
+
+# ---------------
+# Multi-Threading
+# ---------------
+def ensure_list(parameter):
+    return parameter if type(parameter) in (list, tuple, set) else [parameter]
+
+
+def dependency_injection(fn_args, dep_args):
+    """
+    >>> dependency_injection([1, None, None], [2,3])
+    [1, 2, 3]
+    """
+    fn_args = ensure_list(fn_args)
+    dep_args = ensure_list(dep_args)[::-1]
+
+    args = []
+    for fn_arg in fn_args:
+        next_arg = fn_arg if fn_arg is not None else dep_args.pop()
+        args.append(next_arg)
+
+    return args
+
+
+def thread_multi(
+        fn,
+        fn_args: List[Any],
+        dep_args: List[List[Any]],
+        fn_kwargs=None,
+        max_workers=100):
+    """ Run a function /w variable inputs concurrently.
+    The functions are meant to be run for their side effect,
+    and their output is discarded.
+    """
+    if not fn_kwargs:
+        fn_kwargs = dict()
+
+    fn_args = ensure_list(fn_args)
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = (executor.submit(fn, *dependency_injection(fn_args, args), **fn_kwargs)
+                   for args in dep_args)
+        for _ in as_completed(futures):
+            continue

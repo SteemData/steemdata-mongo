@@ -69,7 +69,7 @@ def scrape_operations(mongo):
     last_block = settings.last_block()
 
     # handle batching
-    _batch_size = 100
+    _batch_size = 10
     _head_block_num = blockchain.get_current_block_num()
     batch_dicts = []
 
@@ -85,6 +85,11 @@ def scrape_operations(mongo):
         _batch = merge_with(custom_merge, *_batch_dicts)
         if _batch:
             batch_update_async.delay(_batch)
+            log.info("Scheduled batch: %s comments, %s accounts (+%s full)" % (
+                len(_batch['comments']),
+                len(_batch['accounts_light']),
+                len(_batch['accounts']),
+            ))
 
     log.info('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
@@ -112,7 +117,7 @@ def scrape_operations(mongo):
 
         # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
-            print("last block:", last_block)
+            log.info("last block: %s" % last_block)
             last_block = operation['block_num']
             settings.update_last_block(last_block - 1)
 
