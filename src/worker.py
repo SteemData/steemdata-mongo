@@ -15,9 +15,7 @@ from scraper import (
     scrape_all_users,
     scrape_operations,
     scrape_prices,
-    override,
     refresh_dbstats,
-    validate_operations,
     scrape_blockchain,
 )
 from utils import log_exception
@@ -34,8 +32,6 @@ def run(worker_name):
             if worker_name == 'scrape_operations':
                 mongo.ensure_indexes()
                 scrape_operations(mongo)
-            elif worker_name == 'validate_operations':
-                validate_operations(mongo)
             elif worker_name == 'scrape_blockchain':
                 scrape_blockchain(mongo)
             elif worker_name == 'scrape_all_users':
@@ -44,8 +40,6 @@ def run(worker_name):
                 scrape_prices(mongo)
             elif worker_name == 'refresh_dbstats':
                 refresh_dbstats(mongo)
-            elif worker_name == 'override':
-                override(mongo)
             else:
                 print(f'Worker {worker_name} does not exist!')
                 quit(1)

@@ -15,7 +15,6 @@ from toolz import partition_all
 from methods import (
     update_account,
     update_account_ops,
-    upsert_comment,
 )
 from mongostorage import Settings, Stats
 from utils import (
@@ -26,34 +25,6 @@ from utils import (
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
-
-
-# Accounts, AccountOperations
-# ---------------------------
-def scrape_all_users(mongo, quick=False):
-    """
-    Scrape all existing users
-    and insert/update their entries in Accounts collection.
-    """
-    steem = Steem()
-    s = Settings(mongo)
-
-    account_checkpoint = s.account_checkpoint(quick)
-    if account_checkpoint:
-        usernames = list(get_usernames_batch(account_checkpoint, steem))
-    else:
-        usernames = list(get_usernames_batch(steem))
-
-    for username in usernames:
-        update_account(mongo, username, load_extras=quick)
-        if not quick:
-            update_account_ops(mongo, username)
-        s.set_account_checkpoint(username, quick)
-        log.info('Updated @%s' % username)
-
-    # this was the last batch
-    if account_checkpoint and len(usernames) < 1000:
-        s.set_account_checkpoint(-1, quick)
 
 
 # Operations
@@ -87,30 +58,32 @@ def scrape_operations(mongo):
                 ))
 
 
-def validate_operations(mongo):
-    """ Scan latest N blocks in the database and validate its operations. """
-    blockchain = Blockchain(mode="irreversible")
-    highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
-    lowest_block = max(1, highest_block - 250_000)
+# Accounts, AccountOperations
+# ---------------------------
+def scrape_all_users(mongo, quick=False):
+    """
+    Scrape all existing users
+    and insert/update their entries in Accounts collection.
+    """
+    steem = Steem()
+    s = Settings(mongo)
 
-    for block_num in range(highest_block, lowest_block, -1):
-        if block_num % 100 == 0:
-            log.info('Validating block #%s' % block_num)
-        block = list(blockchain.stream(start_block=block_num, end_block=block_num))
+    account_checkpoint = s.account_checkpoint(quick)
+    if account_checkpoint:
+        usernames = list(get_usernames_batch(account_checkpoint, steem))
+    else:
+        usernames = list(get_usernames_batch(steem))
 
-        # remove all invalid or changed operations
-        conditions = {'block_num': block_num, '_id': {'$nin': [x['_id'] for x in block]}}
-        mongo.Operations.delete_many(conditions)
+    for username in usernames:
+        update_account(mongo, username, load_extras=quick)
+        if not quick:
+            update_account_ops(mongo, username)
+        s.set_account_checkpoint(username, quick)
+        log.info('Updated @%s' % username)
 
-        # insert any missing operations
-        for op in block:
-            with suppress(DuplicateKeyError):
-                transform = compose(strip_dot_from_keys, json_expand, typify)
-                mongo.Operations.insert_one(transform(op))
-
-        # re-process comments (does not re-add deleted posts)
-        for comment in (x for x in block if x['type'] == 'comment'):
-            upsert_comment(mongo, '%s/%s' % (comment['author'], comment['permlink']))
+    # this was the last batch
+    if account_checkpoint and len(usernames) < 1000:
+        s.set_account_checkpoint(-1, quick)
 
 
 # Blockchain
@@ -175,11 +148,6 @@ def scrape_prices(mongo):
         prices = fetch_price_feed()
         mongo.PriceHistory.insert_one(prices)
         time.sleep(60 * 5)
-
-
-def override(mongo):
-    """Various fixes to avoid re-scraping"""
-    time.sleep(600)
 
 
 def run():
