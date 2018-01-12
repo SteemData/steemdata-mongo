@@ -16,7 +16,7 @@ from methods import (
     update_account,
     update_account_ops,
 )
-from mongostorage import Settings, Stats
+from mongostorage import Indexer, Stats
 from utils import (
     fetch_price_feed,
     get_usernames_batch,
@@ -31,9 +31,9 @@ log.setLevel(logging.INFO)
 # ----------
 def scrape_operations(mongo):
     """Fetch all operations (including virtual) from last known block forward."""
-    settings = Settings(mongo)
+    indexer = Indexer(mongo)
     blockchain = Blockchain(mode="irreversible")
-    last_block = settings.last_block()
+    last_block = indexer.get_checkpoint('operations')
 
     history = blockchain.history(
         start_block=last_block,
@@ -49,7 +49,7 @@ def scrape_operations(mongo):
         # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
             last_block = operation['block_num']
-            settings.update_last_block(last_block - 1)
+            indexer.set_checkpoint('operations', last_block - 1)
 
             if last_block % 10 == 0:
                 log.info("Checkpoint #%s: (%s)" % (
@@ -66,9 +66,9 @@ def scrape_all_users(mongo, quick=False):
     and insert/update their entries in Accounts collection.
     """
     steem = Steem()
-    s = Settings(mongo)
+    indexer = Indexer(mongo)
 
-    account_checkpoint = s.account_checkpoint(quick)
+    account_checkpoint = indexer.get_checkpoint('accounts')
     if account_checkpoint:
         usernames = list(get_usernames_batch(account_checkpoint, steem))
     else:
@@ -78,12 +78,12 @@ def scrape_all_users(mongo, quick=False):
         update_account(mongo, username, load_extras=quick)
         if not quick:
             update_account_ops(mongo, username)
-        s.set_account_checkpoint(username, quick)
+        indexer.set_checkpoint('accounts', username)
         log.info('Updated @%s' % username)
 
     # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
-        s.set_account_checkpoint(-1, quick)
+        indexer.set_checkpoint('accounts', -1)
 
 
 # Blockchain
