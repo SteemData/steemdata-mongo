@@ -2,7 +2,7 @@ import logging
 import time
 from contextlib import suppress
 
-from funcy import compose, flatten
+from funcy import compose
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
@@ -10,16 +10,14 @@ from steemdata.utils import (
     json_expand,
     typify,
 )
-from toolz import merge_with, partition_all
+from toolz import partition_all
 
 from methods import (
     update_account,
     update_account_ops,
-    parse_operation,
     upsert_comment,
 )
 from mongostorage import Settings, Stats
-from tasks import batch_update_async
 from utils import (
     fetch_price_feed,
     get_usernames_batch,
@@ -61,47 +59,17 @@ def scrape_all_users(mongo, quick=False):
 # Operations
 # ----------
 def scrape_operations(mongo):
-    """Fetch all operations from last known block forward."""
+    """Fetch all operations (including virtual) from last known block forward."""
     settings = Settings(mongo)
     blockchain = Blockchain(mode="irreversible")
     last_block = settings.last_block()
-
-    # handle batching
-    _batch_size = 10
-    _head_block_num = blockchain.get_current_block_num()
-    batch_dicts = []
 
     history = blockchain.history(
         start_block=last_block,
     )
 
-    def custom_merge(*args):
-        return list(set(filter(bool, flatten(args))))
-
-    def schedule_batch(_batch_dicts):
-        """Send a batch to background worker, and reset _dicts container"""
-        _batch = merge_with(custom_merge, *_batch_dicts)
-        if _batch:
-            batch_update_async.delay(_batch)
-            log.info("Scheduled batch: %s comments, %s accounts (+%s full)" % (
-                len(_batch['comments']),
-                len(_batch['accounts_light']),
-                len(_batch['accounts']),
-            ))
-
     log.info('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
-        # handle comments
-        if operation['type'] == 'comment':
-            post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
-            with suppress(TypeError):
-                upsert_comment(mongo, post_identifier)
-
-        # if we're close to blockchain head, enable batching
-        recent_blocks = 20 * 60 * 24 * 1  # 1 days worth of blocks
-        if last_block > _head_block_num - recent_blocks:
-            batch_dicts.append(parse_operation(operation))
-
         # insert operation
         with suppress(DuplicateKeyError):
             transform = compose(strip_dot_from_keys, json_expand, typify)
@@ -109,19 +77,11 @@ def scrape_operations(mongo):
 
         # if this is a new block, checkpoint it, and schedule batch processing
         if operation['block_num'] != last_block:
-            log.info("last block: %s" % last_block)
             last_block = operation['block_num']
             settings.update_last_block(last_block - 1)
 
             if last_block % 10 == 0:
-                _head_block_num = blockchain.get_current_block_num()
-
-            if last_block % _batch_size == 0:
-                schedule_batch(batch_dicts)
-                batch_dicts = []
-
-            if last_block % 100 == 0:
-                log.info("#%s: (%s)" % (
+                log.info("Checkpoint #%s: (%s)" % (
                     last_block,
                     blockchain.steem.hostname
                 ))
