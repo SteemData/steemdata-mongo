@@ -15,6 +15,7 @@ from toolz import partition_all
 from methods import (
     update_account,
     update_account_ops,
+    update_account_ops_quick,
 )
 from mongostorage import Indexer, Stats
 from utils import (
@@ -64,6 +65,9 @@ def scrape_all_users(mongo, quick=False):
     """
     Scrape all existing users
     and insert/update their entries in Accounts collection.
+
+    Ideally, this would only need to run once, because "scrape_accounts"
+    takes care of accounts that need to be updated in each block.
     """
     steem = Steem()
     indexer = Indexer(mongo)
@@ -75,8 +79,10 @@ def scrape_all_users(mongo, quick=False):
         usernames = list(get_usernames_batch(steem))
 
     for username in usernames:
-        update_account(mongo, username, load_extras=quick)
-        if not quick:
+        update_account(mongo, username, load_extras=True)
+        if quick:
+            update_account_ops_quick(mongo, username)
+        else:
             update_account_ops(mongo, username)
         indexer.set_checkpoint('accounts', username)
         log.info('Updated @%s' % username)
