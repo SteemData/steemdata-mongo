@@ -16,7 +16,7 @@ from scraper import (
     scrape_operations,
     scrape_prices,
     refresh_dbstats,
-    scrape_blockchain,
+    scrape_comments,
 )
 from utils import log_exception
 
@@ -32,8 +32,8 @@ def run(worker_name):
             if worker_name == 'scrape_operations':
                 mongo.ensure_indexes()
                 scrape_operations(mongo)
-            elif worker_name == 'scrape_blockchain':
-                scrape_blockchain(mongo)
+            elif worker_name == 'scrape_comments':
+                scrape_comments(mongo)
             elif worker_name == 'scrape_all_users':
                 scrape_all_users(mongo, quick=False)
             elif worker_name == 'scrape_prices':
@@ -41,7 +41,7 @@ def run(worker_name):
             elif worker_name == 'refresh_dbstats':
                 refresh_dbstats(mongo)
             else:
-                print(f'Worker {worker_name} does not exist!')
+                print(f'Worker "{worker_name}" does not exist!')
                 quit(1)
         except (KeyboardInterrupt, SystemExit):
             print('Quitting...')
@@ -49,9 +49,10 @@ def run(worker_name):
         except Exception as e:
             print('Exception in worker:', worker_name)
             log_exception()
+            time.sleep(5)
 
         # prevent IO overflow
-        time.sleep(5)
+        time.sleep(0.5)
 
 
 def run_multi():
@@ -69,7 +70,7 @@ def main():
     with suppress(KeyboardInterrupt):
         try:
             _, worker_name = sys.argv
-            print("Starting worker: %s" % worker_name)
+            print("Starting worker: '%s'" % worker_name)
             run(worker_name)
         except ValueError:
             print('Usage: python workers.py <worker_name>')
