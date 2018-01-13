@@ -2,10 +2,13 @@ import logging
 import time
 from contextlib import suppress
 
-from funcy import compose
+from funcy import compose, lpluck, lkeep
+from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
+from steem.post import Post
+from steembase.exceptions import PostDoesNotExist
 from steemdata.utils import (
     json_expand,
     typify,
@@ -22,6 +25,7 @@ from utils import (
     fetch_price_feed,
     get_usernames_batch,
     strip_dot_from_keys,
+    thread_multi,
 )
 
 log = logging.getLogger(__name__)
@@ -33,14 +37,13 @@ log.setLevel(logging.INFO)
 def scrape_operations(mongo):
     """Fetch all operations (including virtual) from last known block forward."""
     indexer = Indexer(mongo)
-    blockchain = Blockchain(mode="irreversible")
     last_block = indexer.get_checkpoint('operations')
+    log.info('\n> Fetching operations, starting with block %d...' % last_block)
 
+    blockchain = Blockchain(mode="irreversible")
     history = blockchain.history(
         start_block=last_block,
     )
-
-    log.info('\n> Fetching operations, starting with block %d...' % last_block)
     for operation in history:
         # insert operation
         with suppress(DuplicateKeyError):
@@ -53,10 +56,76 @@ def scrape_operations(mongo):
             indexer.set_checkpoint('operations', last_block - 1)
 
             if last_block % 10 == 0:
-                log.info("Checkpoint #%s: (%s)" % (
+                log.info("Checkpoint: %s (%s)" % (
                     last_block,
                     blockchain.steem.hostname
                 ))
+
+
+# Posts, Comments
+# ---------------
+def scrape_comments(mongo, batch_size=100, max_workers=10):
+    """ Parse operations and post-process for comment/post extraction. """
+    indexer = Indexer(mongo)
+    start_block = indexer.get_checkpoint('comments')
+
+    # TODO: what are the implications of "vote" and "author_reward"?
+    query = {
+        "type": "comment",
+        "block_num": {
+            "$gt": start_block,
+            "$lte": start_block + batch_size,
+        }
+    }
+    projection = {
+        '_id': 0,
+        'block_num': 1,
+        'author': 1,
+        'permlink': 1,
+    }
+    results = list(mongo.Operations.find(query, projection=projection))
+    identifiers = set(f"{x['author']}/{x['permlink']}" for x in results)
+
+    def get_post(identifier):
+        with suppress(PostDoesNotExist):
+            return Post(identifier).export()
+
+    # get Post.export() results in parallel
+    raw_comments = thread_multi(
+        fn=get_post,
+        fn_args=[None],
+        dep_args=list(identifiers),
+        max_workers=max_workers,
+        yield_results=True
+    )
+    raw_comments = lkeep(raw_comments)
+
+    # split into root posts and comments
+    posts = filter(lambda x: x['depth'] > 0, raw_comments)
+    comments = filter(lambda x: x['depth'] == 0, raw_comments)
+
+    # TODO: Should comments trigger parent updates as well?
+    # if block height is recent (< 7 days of blocks)
+    # trigger a celery worker to recursively update parents of these comments
+
+    # Mongo upsert many
+    rp = mongo.Posts.bulk_write(
+        [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+         for x in posts],
+        ordered=False,
+    )
+    rc = mongo.Comments.bulk_write(
+        [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+         for x in comments],
+        ordered=False,
+    )
+
+    index = max(lpluck('block_num', results))
+    indexer.set_checkpoint('comments', index)
+
+    log.info(f'Checkpoint: {index} '
+             f'(Posts: {rp.upserted_count} upserted, {rp.modified_count} modified) '
+             f'(Comments: {rc.upserted_count} upserted, {rc.modified_count} modified) ')
 
 
 # Accounts, AccountOperations
