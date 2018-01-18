@@ -1,9 +1,8 @@
 import datetime as dt
-import json
 from contextlib import suppress
 
 import pymongo
-from funcy import compose, take, first, second
+from funcy import compose, take, first
 from pymongo.errors import DuplicateKeyError, WriteError
 from steem.account import Account
 from steem.post import Post
@@ -154,6 +153,10 @@ def parse_operation(op):
         update_accounts_light.add(op['author'])
         update_comments.add(construct_identifier())
 
+    elif op_type == 'vote':
+        update_accounts_light.add(op['voter'])
+        update_comments.add(construct_identifier())
+
     elif op_type == 'cancel_transfer_from_savings':
         update_accounts_light.add(op['from'])
 
@@ -213,7 +216,7 @@ def parse_operation(op):
 
     elif op_type == 'set_withdraw_vesting_route':
         update_accounts_light.add(op['from_account'])
-        # update_accounts_light.add(op['to_account'])
+        update_accounts_light.add(op['to_account'])
     elif op_type in ['transfer',
                      'transfer_from_savings',
                      'transfer_to_savings',
@@ -221,19 +224,15 @@ def parse_operation(op):
         accs = keep_in_dict(op, ['agent', 'from', 'to', 'who', 'receiver']).values()
         update_accounts_light.update(accs)
 
-    elif op_type == 'vote':
-        update_accounts_light.add(op['voter'])
-        update_comments.add(construct_identifier())
-
-    # handle followers
-    if op_type == 'custom_json':
-        with suppress(ValueError):
-            cmd, op_json = json.loads(op['json'])  # ['follow', {data...}]
-            if cmd == 'follow':
-                accs = keep_in_dict(op_json, ['follower', 'following']).values()
-                update_accounts_light.discard(first(accs))
-                update_accounts_light.discard(second(accs))
-                update_accounts_full.update(accs)
+    # # handle followers
+    # if op_type == 'custom_json':
+    #     with suppress(ValueError):
+    #         cmd, op_json = json.loads(op['json'])  # ['follow', {data...}]
+    #         if cmd == 'follow':
+    #             accs = keep_in_dict(op_json, ['follower', 'following']).values()
+    #             update_accounts_light.discard(first(accs))
+    #             update_accounts_light.discard(second(accs))
+    #             update_accounts_full.update(accs)
 
     return {
         'accounts': list(update_accounts_full),

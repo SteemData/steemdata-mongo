@@ -2,7 +2,14 @@ import logging
 import time
 from contextlib import suppress
 
-from funcy import compose, lpluck, lkeep
+from funcy import (
+    compose,
+    lpluck,
+    lkeep,
+    flatten,
+    merge_with,
+    keep,
+)
 from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
@@ -19,6 +26,8 @@ from methods import (
     update_account,
     update_account_ops,
     update_account_ops_quick,
+    upsert_comment_chain,
+    parse_operation,
 )
 from mongostorage import Indexer, Stats
 from utils import (
@@ -26,6 +35,7 @@ from utils import (
     get_usernames_batch,
     strip_dot_from_keys,
     thread_multi,
+    log_exceptions,
 )
 
 log = logging.getLogger(__name__)
@@ -69,7 +79,6 @@ def scrape_comments(mongo, batch_size=100, max_workers=10):
     indexer = Indexer(mongo)
     start_block = indexer.get_checkpoint('comments')
 
-    # TODO: what are the implications of "vote" and "author_reward"?
     query = {
         "type": "comment",
         "block_num": {
@@ -103,10 +112,6 @@ def scrape_comments(mongo, batch_size=100, max_workers=10):
     # split into root posts and comments
     posts = filter(lambda x: x['depth'] > 0, raw_comments)
     comments = filter(lambda x: x['depth'] == 0, raw_comments)
-
-    # TODO: Should comments trigger parent updates as well?
-    # if block height is recent (< 7 days of blocks)
-    # trigger a celery worker to recursively update parents of these comments
 
     # Mongo upsert many
     rp = mongo.Posts.bulk_write(
@@ -148,7 +153,8 @@ def scrape_all_users(mongo, quick=False):
         usernames = list(get_usernames_batch(steem))
 
     for username in usernames:
-        update_account(mongo, username, load_extras=True)
+        log.info('Updating @%s' % username)
+        update_account(mongo, username, load_extras=False)
         if quick:
             update_account_ops_quick(mongo, username)
         else:
@@ -159,6 +165,78 @@ def scrape_all_users(mongo, quick=False):
     # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
         indexer.set_checkpoint('accounts', -1)
+
+
+# Posts, Comments, Accounts, AccountOperations
+# --------------------------------------------
+def post_processing(mongo, batch_size=100, max_workers=50):
+    indexer = Indexer(mongo)
+    start_block = indexer.get_checkpoint('post_processing')
+
+    query = {
+        "block_num": {
+            "$gt": start_block,
+            "$lte": start_block + batch_size,
+        }
+    }
+    projection = {
+        '_id': 0,
+        'body': 0,
+        'json_metadata': 0,
+    }
+    results = list(mongo.Operations.find(query, projection=projection))
+    batches = map(parse_operation, results)
+
+    # squash for duplicates
+    def custom_merge(*args):
+        return list(set(keep(flatten(args))))
+
+    batch_items = merge_with(custom_merge, *batches)
+
+    # upsert comments (recursively)
+    with log_exceptions():
+        list(thread_multi(
+            fn=upsert_comment_chain,
+            fn_args=[mongo, None],
+            dep_args=batch_items['comments'],
+            fn_kwargs=dict(recursive=True),
+            max_workers=max_workers,
+            yield_results=True,
+        ))
+
+    # only process accounts if the blocks are recent
+    # scrape_all_users should take care of stale updates
+    head_block_num = Steem().steemd.head_block_number
+    if start_block > head_block_num - 20 * 60 * 24 * 10:  # 10 days
+        with log_exceptions():
+            accounts = set(batch_items['accounts_light'] +
+                           batch_items['accounts'])
+            list(thread_multi(
+                fn=update_account,
+                fn_args=[mongo, None],
+                dep_args=list(accounts),
+                fn_kwargs=dict(load_extras=False),
+                max_workers=max_workers,
+                yield_results=True,
+            ))
+            list(thread_multi(
+                fn=update_account_ops_quick,
+                fn_args=[mongo, None],
+                dep_args=list(accounts),
+                fn_kwargs=None,
+                max_workers=max_workers,
+                yield_results=True,
+            ))
+
+    index = max(lpluck('block_num', results))
+    indexer.set_checkpoint('post_processing', index)
+
+    log.info("Checkpoint: %s - %s comments, %s accounts (+%s full)" % (
+        index,
+        len(batch_items['comments']),
+        len(batch_items['accounts_light']),
+        len(batch_items['accounts']),
+    ))
 
 
 # Blockchain
@@ -201,11 +279,12 @@ def block_id_exists(mongo, block_id: str):
 
 
 def last_block_num(mongo) -> int:
-    return mongo.db['Blockchain'].find_one(
+    last_block = mongo.db['Blockchain'].find_one(
         filter={},
         projection={'_id': 0, 'block_num': 1},
         sort=[('block_num', -1)]
-    ).get('block_id', 1)
+    )
+    return last_block.get('block_num', 1) if last_block else 1
 
 
 # Misc
@@ -231,7 +310,9 @@ def run():
     m = MongoStorage()
     m.ensure_indexes()
     with timeit():
-        scrape_operations(m)
+        # scrape_operations(m)
+        # scrape_comments(m)
+        post_processing(m)
         # update_account(m, 'furion', load_extras=True)
         # update_account_ops(m, 'furion')
         # scrape_all_users(m, False)
