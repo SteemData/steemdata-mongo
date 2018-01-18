@@ -1,7 +1,7 @@
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime
-from typing import List, Any
+from typing import List, Any, Union
 
 from funcy import contextmanager
 from steem import Steem
@@ -125,12 +125,20 @@ def dependency_injection(fn_args, dep_args):
 def thread_multi(
         fn,
         fn_args: List[Any],
-        dep_args: List[List[Any]],
+        dep_args: List[Union[Any, List[Any]]],
         fn_kwargs=None,
-        max_workers=100):
+        max_workers=100,
+        yield_results=False):
     """ Run a function /w variable inputs concurrently.
-    The functions are meant to be run for their side effect,
-    and their output is discarded.
+
+    Args:
+        fn: A pointer to the function that will be executed in parallel.
+        fn_args: A list of arguments the function takes. None arguments will be
+        displaced trough `dep_args`.
+        dep_args: A list of lists of arguments to displace in `fn_args`.
+        fn_kwargs: Keyword arguments that `fn` takes.
+        max_workers: A cap of threads to run in parallel.
+        yield_results: Yield or discard results.
     """
     if not fn_kwargs:
         fn_kwargs = dict()
@@ -140,5 +148,10 @@ def thread_multi(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = (executor.submit(fn, *dependency_injection(fn_args, args), **fn_kwargs)
                    for args in dep_args)
-        for _ in as_completed(futures):
-            continue
+
+        if yield_results:
+            for result in as_completed(futures):
+                yield result.result()
+        else:
+            for _ in as_completed(futures):
+                continue

@@ -2,32 +2,135 @@ import logging
 import time
 from contextlib import suppress
 
-from funcy import compose, flatten
+from funcy import (
+    compose,
+    lpluck,
+    lkeep,
+    flatten,
+    merge_with,
+    keep,
+)
+from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
+from steem.post import Post
+from steembase.exceptions import PostDoesNotExist
 from steemdata.utils import (
     json_expand,
     typify,
 )
-from toolz import merge_with, partition_all
+from toolz import partition_all
 
 from methods import (
     update_account,
     update_account_ops,
+    update_account_ops_quick,
+    upsert_comment_chain,
     parse_operation,
-    upsert_comment,
 )
-from mongostorage import Settings, Stats
-from tasks import batch_update_async
+from mongostorage import Indexer, Stats
 from utils import (
     fetch_price_feed,
     get_usernames_batch,
     strip_dot_from_keys,
+    thread_multi,
+    log_exceptions,
 )
 
 log = logging.getLogger(__name__)
 log.setLevel(logging.INFO)
+
+
+# Operations
+# ----------
+def scrape_operations(mongo):
+    """Fetch all operations (including virtual) from last known block forward."""
+    indexer = Indexer(mongo)
+    last_block = indexer.get_checkpoint('operations')
+    log.info('\n> Fetching operations, starting with block %d...' % last_block)
+
+    blockchain = Blockchain(mode="irreversible")
+    history = blockchain.history(
+        start_block=last_block,
+    )
+    for operation in history:
+        # insert operation
+        with suppress(DuplicateKeyError):
+            transform = compose(strip_dot_from_keys, json_expand, typify)
+            mongo.Operations.insert_one(transform(operation))
+
+        # if this is a new block, checkpoint it, and schedule batch processing
+        if operation['block_num'] != last_block:
+            last_block = operation['block_num']
+            indexer.set_checkpoint('operations', last_block - 1)
+
+            if last_block % 10 == 0:
+                log.info("Checkpoint: %s (%s)" % (
+                    last_block,
+                    blockchain.steem.hostname
+                ))
+
+
+# Posts, Comments
+# ---------------
+def scrape_comments(mongo, batch_size=100, max_workers=10):
+    """ Parse operations and post-process for comment/post extraction. """
+    indexer = Indexer(mongo)
+    start_block = indexer.get_checkpoint('comments')
+
+    query = {
+        "type": "comment",
+        "block_num": {
+            "$gt": start_block,
+            "$lte": start_block + batch_size,
+        }
+    }
+    projection = {
+        '_id': 0,
+        'block_num': 1,
+        'author': 1,
+        'permlink': 1,
+    }
+    results = list(mongo.Operations.find(query, projection=projection))
+    identifiers = set(f"{x['author']}/{x['permlink']}" for x in results)
+
+    def get_post(identifier):
+        with suppress(PostDoesNotExist):
+            return Post(identifier).export()
+
+    # get Post.export() results in parallel
+    raw_comments = thread_multi(
+        fn=get_post,
+        fn_args=[None],
+        dep_args=list(identifiers),
+        max_workers=max_workers,
+        yield_results=True
+    )
+    raw_comments = lkeep(raw_comments)
+
+    # split into root posts and comments
+    posts = filter(lambda x: x['depth'] > 0, raw_comments)
+    comments = filter(lambda x: x['depth'] == 0, raw_comments)
+
+    # Mongo upsert many
+    rp = mongo.Posts.bulk_write(
+        [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+         for x in posts],
+        ordered=False,
+    )
+    rc = mongo.Comments.bulk_write(
+        [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+         for x in comments],
+        ordered=False,
+    )
+
+    index = max(lpluck('block_num', results))
+    indexer.set_checkpoint('comments', index)
+
+    log.info(f'Checkpoint: {index} '
+             f'(Posts: {rp.upserted_count} upserted, {rp.modified_count} modified) '
+             f'(Comments: {rc.upserted_count} upserted, {rc.modified_count} modified) ')
 
 
 # Accounts, AccountOperations
@@ -36,122 +139,104 @@ def scrape_all_users(mongo, quick=False):
     """
     Scrape all existing users
     and insert/update their entries in Accounts collection.
+
+    Ideally, this would only need to run once, because "scrape_accounts"
+    takes care of accounts that need to be updated in each block.
     """
     steem = Steem()
-    s = Settings(mongo)
-    quick = False  # TODO: remove temporary override
+    indexer = Indexer(mongo)
 
-    account_checkpoint = s.account_checkpoint(quick)
+    account_checkpoint = indexer.get_checkpoint('accounts')
     if account_checkpoint:
         usernames = list(get_usernames_batch(account_checkpoint, steem))
     else:
         usernames = list(get_usernames_batch(steem))
 
     for username in usernames:
-        update_account(mongo, username, load_extras=quick)
-        if not quick:
+        log.info('Updating @%s' % username)
+        update_account(mongo, username, load_extras=False)
+        if quick:
+            update_account_ops_quick(mongo, username)
+        else:
             update_account_ops(mongo, username)
-        s.set_account_checkpoint(username, quick)
+        indexer.set_checkpoint('accounts', username)
         log.info('Updated @%s' % username)
 
     # this was the last batch
     if account_checkpoint and len(usernames) < 1000:
-        s.set_account_checkpoint(-1, quick)
+        indexer.set_checkpoint('accounts', -1)
 
 
-# Operations
-# ----------
-def scrape_operations(mongo):
-    """Fetch all operations from last known block forward."""
-    settings = Settings(mongo)
-    blockchain = Blockchain(mode="irreversible")
-    last_block = settings.last_block()
+# Posts, Comments, Accounts, AccountOperations
+# --------------------------------------------
+def post_processing(mongo, batch_size=100, max_workers=50):
+    indexer = Indexer(mongo)
+    start_block = indexer.get_checkpoint('post_processing')
 
-    # handle batching
-    _batch_size = 10
-    _head_block_num = blockchain.get_current_block_num()
-    batch_dicts = []
+    query = {
+        "block_num": {
+            "$gt": start_block,
+            "$lte": start_block + batch_size,
+        }
+    }
+    projection = {
+        '_id': 0,
+        'body': 0,
+        'json_metadata': 0,
+    }
+    results = list(mongo.Operations.find(query, projection=projection))
+    batches = map(parse_operation, results)
 
-    history = blockchain.history(
-        start_block=last_block,
-    )
-
+    # squash for duplicates
     def custom_merge(*args):
-        return list(set(filter(bool, flatten(args))))
+        return list(set(keep(flatten(args))))
 
-    def schedule_batch(_batch_dicts):
-        """Send a batch to background worker, and reset _dicts container"""
-        _batch = merge_with(custom_merge, *_batch_dicts)
-        if _batch:
-            batch_update_async.delay(_batch)
-            log.info("Scheduled batch: %s comments, %s accounts (+%s full)" % (
-                len(_batch['comments']),
-                len(_batch['accounts_light']),
-                len(_batch['accounts']),
+    batch_items = merge_with(custom_merge, *batches)
+
+    # upsert comments (recursively)
+    with log_exceptions():
+        list(thread_multi(
+            fn=upsert_comment_chain,
+            fn_args=[mongo, None],
+            dep_args=batch_items['comments'],
+            fn_kwargs=dict(recursive=True),
+            max_workers=max_workers,
+            yield_results=True,
+        ))
+
+    # only process accounts if the blocks are recent
+    # scrape_all_users should take care of stale updates
+    head_block_num = Steem().steemd.head_block_number
+    if start_block > head_block_num - 20 * 60 * 24 * 10:  # 10 days
+        with log_exceptions():
+            accounts = set(batch_items['accounts_light'] +
+                           batch_items['accounts'])
+            list(thread_multi(
+                fn=update_account,
+                fn_args=[mongo, None],
+                dep_args=list(accounts),
+                fn_kwargs=dict(load_extras=False),
+                max_workers=max_workers,
+                yield_results=True,
+            ))
+            list(thread_multi(
+                fn=update_account_ops_quick,
+                fn_args=[mongo, None],
+                dep_args=list(accounts),
+                fn_kwargs=None,
+                max_workers=max_workers,
+                yield_results=True,
             ))
 
-    log.info('\n> Fetching operations, starting with block %d...' % last_block)
-    for operation in history:
-        # handle comments
-        if operation['type'] == 'comment':
-            post_identifier = "@%s/%s" % (operation['author'], operation['permlink'])
-            with suppress(TypeError):
-                upsert_comment(mongo, post_identifier)
+    index = max(lpluck('block_num', results))
+    indexer.set_checkpoint('post_processing', index)
 
-        # if we're close to blockchain head, enable batching
-        recent_blocks = 20 * 60 * 24 * 1  # 1 days worth of blocks
-        if last_block > _head_block_num - recent_blocks:
-            batch_dicts.append(parse_operation(operation))
-
-        # insert operation
-        with suppress(DuplicateKeyError):
-            transform = compose(strip_dot_from_keys, json_expand, typify)
-            mongo.Operations.insert_one(transform(operation))
-
-        # if this is a new block, checkpoint it, and schedule batch processing
-        if operation['block_num'] != last_block:
-            log.info("last block: %s" % last_block)
-            last_block = operation['block_num']
-            settings.update_last_block(last_block - 1)
-
-            if last_block % 10 == 0:
-                _head_block_num = blockchain.get_current_block_num()
-
-            if last_block % _batch_size == 0:
-                schedule_batch(batch_dicts)
-                batch_dicts = []
-
-            if last_block % 100 == 0:
-                log.info("#%s: (%s)" % (
-                    last_block,
-                    blockchain.steem.hostname
-                ))
-
-
-def validate_operations(mongo):
-    """ Scan latest N blocks in the database and validate its operations. """
-    blockchain = Blockchain(mode="irreversible")
-    highest_block = mongo.Operations.find_one({}, sort=[('block_num', -1)])['block_num']
-    lowest_block = max(1, highest_block - 250_000)
-
-    for block_num in range(highest_block, lowest_block, -1):
-        if block_num % 100 == 0:
-            log.info('Validating block #%s' % block_num)
-        block = list(blockchain.stream(start_block=block_num, end_block=block_num))
-
-        # remove all invalid or changed operations
-        conditions = {'block_num': block_num, '_id': {'$nin': [x['_id'] for x in block]}}
-        mongo.Operations.delete_many(conditions)
-
-        # insert any missing operations
-        for op in block:
-            with suppress(DuplicateKeyError):
-                transform = compose(strip_dot_from_keys, json_expand, typify)
-                mongo.Operations.insert_one(transform(op))
-
-        # re-process comments (does not re-add deleted posts)
-        for comment in (x for x in block if x['type'] == 'comment'):
-            upsert_comment(mongo, '%s/%s' % (comment['author'], comment['permlink']))
+    log.info("Checkpoint: %s - %s comments, %s accounts (+%s full)" % (
+        index,
+        len(batch_items['comments']),
+        len(batch_items['accounts_light']),
+        len(batch_items['accounts']),
+    ))
 
 
 # Blockchain
@@ -194,11 +279,12 @@ def block_id_exists(mongo, block_id: str):
 
 
 def last_block_num(mongo) -> int:
-    return mongo.db['Blockchain'].find_one(
+    last_block = mongo.db['Blockchain'].find_one(
         filter={},
         projection={'_id': 0, 'block_num': 1},
         sort=[('block_num', -1)]
-    ).get('block_id', 1)
+    )
+    return last_block.get('block_num', 1) if last_block else 1
 
 
 # Misc
@@ -218,18 +304,15 @@ def scrape_prices(mongo):
         time.sleep(60 * 5)
 
 
-def override(mongo):
-    """Various fixes to avoid re-scraping"""
-    time.sleep(600)
-
-
 def run():
     from mongostorage import MongoStorage
     from steemdata.helpers import timeit
     m = MongoStorage()
     m.ensure_indexes()
     with timeit():
-        scrape_operations(m)
+        # scrape_operations(m)
+        # scrape_comments(m)
+        post_processing(m)
         # update_account(m, 'furion', load_extras=True)
         # update_account_ops(m, 'furion')
         # scrape_all_users(m, False)

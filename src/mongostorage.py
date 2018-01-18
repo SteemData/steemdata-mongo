@@ -83,34 +83,24 @@ class MongoStorage(object):
         self.PriceHistory.create_index([('timestamp', -1)])
 
 
-class Settings(object):
+class Indexer(object):
     def __init__(self, mongo):
-        self._settings = mongo.db['settings']
-        self.settings = self._settings.find_one()
+        self.coll = mongo.db['_indexer']
+        self.instance = self.coll.find_one()
 
-        if not self.settings:
-            self._settings.insert_one({
-                "last_block": 1,
+        if not self.instance:
+            self.coll.insert_one({
+                "operations_checkpoint": 1,
             })
-            self.settings = self._settings.find_one()
+            self.instance = self.coll.find_one()
 
-    def last_block(self):
-        return self.settings.get('last_block', 1)
+    def get_checkpoint(self, name):
+        field = f'{name}_checkpoint'
+        return self.instance.get(field, 1)
 
-    def update_last_block(self, block_num):
-        return self._settings.update_one({}, {"$set": {'last_block': block_num}})
-
-    def account_checkpoint(self, quick):
-        field = 'account_checkpoint'
-        if quick:
-            field = 'account_checkpoint_quick'
-        return self.settings.get(field, 1)
-
-    def set_account_checkpoint(self, index_num, quick):
-        field = 'account_checkpoint'
-        if quick:
-            field = 'account_checkpoint_quick'
-        return self._settings.update_one({}, {"$set": {field: index_num}})
+    def set_checkpoint(self, name, index):
+        field = f'{name}_checkpoint'
+        return self.coll.update_one({}, {"$set": {field: index}})
 
 
 class Stats(object):
