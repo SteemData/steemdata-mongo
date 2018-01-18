@@ -82,6 +82,20 @@ class MongoStorage(object):
 
         self.PriceHistory.create_index([('timestamp', -1)])
 
+        # 4 jesta's tools
+        self.Operations.create_index(
+            [('producer', 1), ('type', 1), ('timestamp', 1)],
+            sparse=True, background=True)
+        self.Operations.create_index(
+            [('curator', 1), ('type', 1), ('timestamp', 1)],
+            sparse=True, background=True)
+        self.Operations.create_index(
+            [('benefactor', 1), ('type', 1), ('timestamp', 1)],
+            sparse=True, background=True)
+        self.Operations.create_index(
+            [('author', 1), ('type', 1), ('timestamp', 1)],
+            sparse=True, background=True)
+
 
 class Indexer(object):
     def __init__(self, mongo):
