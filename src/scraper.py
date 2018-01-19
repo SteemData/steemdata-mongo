@@ -9,6 +9,8 @@ from funcy import (
     flatten,
     merge_with,
     keep,
+    lfilter,
+    silent,
 )
 from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
@@ -110,27 +112,34 @@ def scrape_comments(mongo, batch_size=100, max_workers=10):
     raw_comments = lkeep(raw_comments)
 
     # split into root posts and comments
-    posts = filter(lambda x: x['depth'] > 0, raw_comments)
-    comments = filter(lambda x: x['depth'] == 0, raw_comments)
+    posts = lfilter(lambda x: x['depth'] == 0, raw_comments)
+    comments = lfilter(lambda x: x['depth'] > 0, raw_comments)
 
     # Mongo upsert many
-    rp = mongo.Posts.bulk_write(
-        [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
-         for x in posts],
-        ordered=False,
-    )
-    rc = mongo.Comments.bulk_write(
-        [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
-         for x in comments],
-        ordered=False,
-    )
+    log_output = ''
+    if posts:
+        r = mongo.Posts.bulk_write(
+            [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+             for x in posts],
+            ordered=False,
+        )
+        log_output += \
+            f'(Posts: {r.upserted_count} upserted, {r.modified_count} modified) '
+    if comments:
+        r = mongo.Comments.bulk_write(
+            [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+             for x in comments],
+            ordered=False,
+        )
+        log_output += \
+            f'(Comments: {r.upserted_count} upserted, {r.modified_count} modified) '
 
-    index = max(lpluck('block_num', results))
+    # We are only querying {type: 'comment'} blocks and sometimes
+    # the gaps are larger than the batch_size.
+    index = silent(max)(lpluck('block_num', results)) or (start_block + batch_size)
     indexer.set_checkpoint('comments', index)
 
-    log.info(f'Checkpoint: {index} '
-             f'(Posts: {rp.upserted_count} upserted, {rp.modified_count} modified) '
-             f'(Comments: {rc.upserted_count} upserted, {rc.modified_count} modified) ')
+    log.info(f'Checkpoint: {index} {log_output}')
 
 
 # Accounts, AccountOperations
@@ -311,8 +320,8 @@ def run():
     m.ensure_indexes()
     with timeit():
         # scrape_operations(m)
-        # scrape_comments(m)
-        post_processing(m)
+        scrape_comments(m)
+        # post_processing(m)
         # update_account(m, 'furion', load_extras=True)
         # update_account_ops(m, 'furion')
         # scrape_all_users(m, False)
