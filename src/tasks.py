@@ -78,18 +78,18 @@ if str(caller_name()) != '__main__':
 tasks = new_celery('tasks')
 
 
-@tasks.task
+@tasks.task(ignore_result=True)
 def update_account_async(account_name, load_extras=False):
     update_account(mongo, account_name, load_extras=load_extras)
     update_account_ops_quick(mongo, account_name)
 
 
-@tasks.task
+@tasks.task(ignore_result=True)
 def update_comment_async(post_identifier, recursive=False):
     upsert_comment_chain(mongo, post_identifier, recursive)
 
 
-@tasks.task
+@tasks.task(ignore_result=True)
 def batch_update_async(batch_items: dict):
     # todo break this batch into posts and account updates
 
