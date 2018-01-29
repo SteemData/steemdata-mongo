@@ -97,6 +97,11 @@ def scrape_comments(mongo, batch_size=100, max_workers=10):
     results = list(mongo.Operations.find(query, projection=projection))
     identifiers = set(f"{x['author']}/{x['permlink']}" for x in results)
 
+    # handle an edge case when we are too close to the head,
+    # and the batch contains no work to do
+    if not results and is_recent(start_block, days=1):
+        return
+
     def get_post(identifier):
         with suppress(PostDoesNotExist):
             return Post(identifier).export()
@@ -196,6 +201,11 @@ def post_processing(mongo, batch_size=100, max_workers=50):
     results = list(mongo.Operations.find(query, projection=projection))
     batches = map(parse_operation, results)
 
+    # handle an edge case when we are too close to the head,
+    # and the batch contains no work to do
+    if not results and is_recent(start_block, days=1):
+        return
+
     # squash for duplicates
     def custom_merge(*args):
         return list(set(keep(flatten(args))))
@@ -215,8 +225,7 @@ def post_processing(mongo, batch_size=100, max_workers=50):
 
     # only process accounts if the blocks are recent
     # scrape_all_users should take care of stale updates
-    head_block_num = Steem().steemd.head_block_number
-    if start_block > head_block_num - 20 * 60 * 24 * 10:  # 10 days
+    if is_recent(start_block, days=10):
         with log_exceptions():
             accounts = set(batch_items['accounts_light'] +
                            batch_items['accounts'])
@@ -294,6 +303,11 @@ def last_block_num(mongo) -> int:
         sort=[('block_num', -1)]
     )
     return last_block.get('block_num', 1) if last_block else 1
+
+
+def is_recent(block_num, days):
+    head_block_num = Steem().steemd.head_block_number
+    return block_num > head_block_num - 20 * 60 * 24 * days
 
 
 # Misc
