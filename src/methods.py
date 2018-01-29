@@ -31,7 +31,7 @@ def upsert_comment_chain(mongo, identifier, recursive=False):
 
 def upsert_comment(mongo, identifier):
     """ Upsert root post or comment. """
-    with suppress(PostDoesNotExist):
+    with suppress(PostDoesNotExist, DuplicateKeyError):
         p = Post(identifier)
         update = {'$set': strip_dot_from_keys(p.export())}
         if p.is_comment():
