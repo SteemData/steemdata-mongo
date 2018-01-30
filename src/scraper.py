@@ -76,7 +76,7 @@ def scrape_operations(mongo):
 
 # Posts, Comments
 # ---------------
-def scrape_comments(mongo, batch_size=100, max_workers=10):
+def scrape_comments(mongo, batch_size=250, max_workers=50):
     """ Parse operations and post-process for comment/post extraction. """
     indexer = Indexer(mongo)
     start_block = indexer.get_checkpoint('comments')
