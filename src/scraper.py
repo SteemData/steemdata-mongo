@@ -157,7 +157,7 @@ def scrape_all_users(mongo, quick=False):
     Ideally, this would only need to run once, because "scrape_accounts"
     takes care of accounts that need to be updated in each block.
     """
-    steem = Steem()
+    steem = Steem(nodes=['https://rpc.buildteam.io'])
     indexer = Indexer(mongo)
 
     account_checkpoint = indexer.get_checkpoint('accounts')
@@ -168,7 +168,7 @@ def scrape_all_users(mongo, quick=False):
 
     for username in usernames:
         log.info('Updating @%s' % username)
-        update_account(mongo, username, load_extras=False)
+        update_account(mongo, username, load_extras=True)
         if quick:
             update_account_ops_quick(mongo, username)
         else:
