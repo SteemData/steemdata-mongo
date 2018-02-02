@@ -9,8 +9,9 @@ from steem.post import Post
 from steem.utils import keep_in_dict
 from steembase.exceptions import PostDoesNotExist
 from steemdata.utils import typify, json_expand, remove_body
+from toolz import pipe
 
-from utils import strip_dot_from_keys
+from utils import strip_dot_from_keys, safe_json_metadata
 
 
 def upsert_comment_chain(mongo, identifier, recursive=False):
@@ -29,19 +30,25 @@ def upsert_comment_chain(mongo, identifier, recursive=False):
             upsert_comment_chain(mongo, parent_identifier, recursive)
 
 
+def get_comment(identifier):
+    with suppress(PostDoesNotExist):
+        return pipe(
+            Post(identifier).export(),
+            strip_dot_from_keys,
+            safe_json_metadata
+        )
+
+
 def upsert_comment(mongo, identifier):
     """ Upsert root post or comment. """
     with suppress(PostDoesNotExist, DuplicateKeyError):
-        p = Post(identifier)
-        update = {'$set': {
-            **strip_dot_from_keys(p.export()),
-            'updatedAt': dt.datetime.utcnow()
-        }}
-        if p.is_comment():
+        c = get_comment(identifier)
+        update = {'$set': {**c, 'updatedAt': dt.datetime.utcnow()}}
+        if c['depth'] > 0:
             return mongo.Comments.update(
-                {'identifier': p.identifier},
+                {'identifier': c['identifier']},
                 update, upsert=True)
-        return mongo.Posts.update({'identifier': p.identifier}, update, upsert=True)
+        return mongo.Posts.update({'identifier': c['identifier']}, update, upsert=True)
 
 
 def update_account(mongo, username, load_extras=True):

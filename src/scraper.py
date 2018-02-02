@@ -17,8 +17,6 @@ from pymongo import UpdateOne
 from pymongo.errors import DuplicateKeyError
 from steem import Steem
 from steem.blockchain import Blockchain
-from steem.post import Post
-from steembase.exceptions import PostDoesNotExist
 from steemdata.utils import (
     json_expand,
     typify,
@@ -31,6 +29,7 @@ from methods import (
     update_account_ops_quick,
     upsert_comment_chain,
     parse_operation,
+    get_comment,
 )
 from mongostorage import Indexer, Stats
 from utils import (
@@ -103,13 +102,9 @@ def scrape_comments(mongo, batch_size=250, max_workers=50):
     if not results and is_recent(start_block, days=1):
         return
 
-    def get_post(identifier):
-        with suppress(PostDoesNotExist):
-            return strip_dot_from_keys(Post(identifier).export())
-
     # get Post.export() results in parallel
     raw_comments = thread_multi(
-        fn=get_post,
+        fn=get_comment,
         fn_args=[None],
         dep_args=list(identifiers),
         max_workers=max_workers,
