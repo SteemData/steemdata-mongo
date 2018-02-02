@@ -1,3 +1,4 @@
+import datetime as dt
 import logging
 import time
 from contextlib import suppress
@@ -104,7 +105,7 @@ def scrape_comments(mongo, batch_size=250, max_workers=50):
 
     def get_post(identifier):
         with suppress(PostDoesNotExist):
-            return Post(identifier).export()
+            return strip_dot_from_keys(Post(identifier).export())
 
     # get Post.export() results in parallel
     raw_comments = thread_multi(
@@ -124,7 +125,9 @@ def scrape_comments(mongo, batch_size=250, max_workers=50):
     log_output = ''
     if posts:
         r = mongo.Posts.bulk_write(
-            [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+            [UpdateOne({'identifier': x['identifier']},
+                       {'$set': {**x, 'updatedAt': dt.datetime.utcnow()}},
+                       upsert=True)
              for x in posts],
             ordered=False,
         )
@@ -132,7 +135,9 @@ def scrape_comments(mongo, batch_size=250, max_workers=50):
             f'(Posts: {r.upserted_count} upserted, {r.modified_count} modified) '
     if comments:
         r = mongo.Comments.bulk_write(
-            [UpdateOne({'identifier': x['identifier']}, {'$set': x}, upsert=True)
+            [UpdateOne({'identifier': x['identifier']},
+                       {'$set': {**x, 'updatedAt': dt.datetime.utcnow()}},
+                       upsert=True)
              for x in comments],
             ordered=False,
         )

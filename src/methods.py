@@ -33,7 +33,10 @@ def upsert_comment(mongo, identifier):
     """ Upsert root post or comment. """
     with suppress(PostDoesNotExist, DuplicateKeyError):
         p = Post(identifier)
-        update = {'$set': strip_dot_from_keys(p.export())}
+        update = {'$set': {
+            **strip_dot_from_keys(p.export()),
+            'updatedAt': dt.datetime.utcnow()
+        }}
         if p.is_comment():
             return mongo.Comments.update(
                 {'identifier': p.identifier},
