@@ -107,11 +107,13 @@ def safe_json_metadata(post: dict) -> dict:
         mongod --setParameter failIndexKeyTooLong=false
     """
     def truncate(data):
-        return {
-            **data,
-            'tags': [x for x in data.get('tags', []) if len(x) < 50],
-            'users': [x for x in data.get('users', []) if len(x) < 20],
-        }
+        if isinstance(data, dict):
+            data = {
+                **data,
+                'tags': [x for x in data.get('tags', []) if len(x) < 50],
+                'users': [x for x in data.get('users', []) if len(x) < 20],
+            }
+        return data
 
     return {
         **post,
