@@ -110,8 +110,10 @@ def safe_json_metadata(post: dict) -> dict:
         if isinstance(data, dict):
             data = {
                 **data,
-                'tags': [x for x in data.get('tags', []) if len(x) < 50],
-                'users': [x for x in data.get('users', []) if len(x) < 20],
+                'tags': [x for x in data.get('tags', [])
+                         if isinstance(x, str) and len(x) < 50],
+                'users': [x for x in data.get('users', [])
+                          if isinstance(x, str) and len(x) < 20],
             }
         return data
 
