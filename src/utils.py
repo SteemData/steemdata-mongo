@@ -106,6 +106,7 @@ def safe_json_metadata(post: dict) -> dict:
     Alternatively, run with:
         mongod --setParameter failIndexKeyTooLong=false
     """
+
     def truncate(data):
         if isinstance(data, dict):
             data = {
@@ -152,7 +153,7 @@ def thread_multi(
         dep_args: List[Union[Any, List[Any]]],
         fn_kwargs=None,
         max_workers=100,
-        yield_results=False):
+        re_raise_errors=True):
     """ Run a function /w variable inputs concurrently.
 
     Args:
@@ -162,7 +163,7 @@ def thread_multi(
         dep_args: A list of lists of arguments to displace in `fn_args`.
         fn_kwargs: Keyword arguments that `fn` takes.
         max_workers: A cap of threads to run in parallel.
-        yield_results: Yield or discard results.
+        re_raise_errors: Throw exceptions that happen in the worker pool.
     """
     if not fn_kwargs:
         fn_kwargs = dict()
@@ -173,9 +174,10 @@ def thread_multi(
         futures = (executor.submit(fn, *dependency_injection(fn_args, args), **fn_kwargs)
                    for args in dep_args)
 
-        if yield_results:
-            for result in as_completed(futures):
-                yield result.result()
-        else:
-            for _ in as_completed(futures):
-                continue
+        for future in as_completed(futures):
+            try:
+                yield future.result()
+            except Exception as e:
+                log_exception()
+                if re_raise_errors:
+                    raise e

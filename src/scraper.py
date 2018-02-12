@@ -37,7 +37,6 @@ from utils import (
     get_usernames_batch,
     strip_dot_from_keys,
     thread_multi,
-    log_exceptions,
 )
 
 log = logging.getLogger(__name__)
@@ -108,7 +107,7 @@ def scrape_comments(mongo, batch_size=250, max_workers=50):
         fn_args=[None],
         dep_args=list(identifiers),
         max_workers=max_workers,
-        yield_results=True
+        re_raise_errors=True,
     )
     raw_comments = lkeep(raw_comments)
 
@@ -213,38 +212,36 @@ def post_processing(mongo, batch_size=100, max_workers=50):
     batch_items = merge_with(custom_merge, *batches)
 
     # upsert comments (recursively)
-    with log_exceptions():
-        list(thread_multi(
-            fn=upsert_comment_chain,
-            fn_args=[mongo, None],
-            dep_args=batch_items['comments'],
-            fn_kwargs=dict(recursive=True),
-            max_workers=max_workers,
-            yield_results=True,
-        ))
+    list(thread_multi(
+        fn=upsert_comment_chain,
+        fn_args=[mongo, None],
+        dep_args=batch_items['comments'],
+        fn_kwargs=dict(recursive=True),
+        max_workers=max_workers,
+        re_raise_errors=False,
+    ))
 
     # only process accounts if the blocks are recent
     # scrape_all_users should take care of stale updates
     if is_recent(start_block, days=10):
-        with log_exceptions():
-            accounts = set(batch_items['accounts_light'] +
-                           batch_items['accounts'])
-            list(thread_multi(
-                fn=update_account,
-                fn_args=[mongo, None],
-                dep_args=list(accounts),
-                fn_kwargs=dict(load_extras=False),
-                max_workers=max_workers,
-                yield_results=True,
-            ))
-            list(thread_multi(
-                fn=update_account_ops_quick,
-                fn_args=[mongo, None],
-                dep_args=list(accounts),
-                fn_kwargs=None,
-                max_workers=max_workers,
-                yield_results=True,
-            ))
+        accounts = set(batch_items['accounts_light'] +
+                       batch_items['accounts'])
+        list(thread_multi(
+            fn=update_account,
+            fn_args=[mongo, None],
+            dep_args=list(accounts),
+            fn_kwargs=dict(load_extras=False),
+            max_workers=max_workers,
+            re_raise_errors=False,
+        ))
+        list(thread_multi(
+            fn=update_account_ops_quick,
+            fn_args=[mongo, None],
+            dep_args=list(accounts),
+            fn_kwargs=None,
+            max_workers=max_workers,
+            re_raise_errors=False,
+        ))
 
     index = max(lpluck('block_num', results))
     indexer.set_checkpoint('post_processing', index)
