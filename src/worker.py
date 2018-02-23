@@ -49,6 +49,9 @@ def run(worker_name):
         except (KeyboardInterrupt, SystemExit):
             print('Quitting...')
             exit(0)
+        except RuntimeError:
+            log_exception()
+            exit(1)
         except Exception as e:
             print('Exception in worker:', worker_name)
             log_exception()
